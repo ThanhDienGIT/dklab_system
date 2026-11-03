@@ -71,7 +71,7 @@ function InvoiceForm({ booking, settings }: { booking: BookingWithPrice | null; 
       <div className="grid gap-5 lg:grid-cols-3">
         <section className="card space-y-3 p-4 lg:col-span-1">
           <h2 className="font-semibold">Người mua</h2>
-          <Field label="Họ tên người mua *"><input className="input" {...sb("buyerName")} /></Field>
+          <Field required label="Họ tên người mua"><input className="input" {...sb("buyerName")} /></Field>
           <Field label="Tên đơn vị (nếu xuất cho công ty)"><input className="input" {...sb("buyerLegalName")} /></Field>
           <Field label="Mã số thuế"><input className="input" {...sb("buyerTaxCode")} /></Field>
           <Field label="Địa chỉ"><input className="input" {...sb("buyerAddress")} /></Field>
@@ -92,7 +92,7 @@ function InvoiceForm({ booking, settings }: { booking: BookingWithPrice | null; 
           <div className="space-y-3">
             {lines.map((l, i) => (
               <div key={i} className="grid grid-cols-12 gap-2 rounded-lg border border-slate-200 p-3">
-                <Field label="Tên hàng hóa, dịch vụ" className="col-span-12"><input className="input" value={l.itemName} onChange={(e) => setLine(i, "itemName", e.target.value)} /></Field>
+                <Field required label="Tên hàng hóa, dịch vụ" className="col-span-12"><input className="input" value={l.itemName} onChange={(e) => setLine(i, "itemName", e.target.value)} /></Field>
                 <Field label="ĐVT" className="col-span-3 sm:col-span-2"><input className="input" value={l.unit} onChange={(e) => setLine(i, "unit", e.target.value)} /></Field>
                 <Field label="SL" className="col-span-3 sm:col-span-2"><input className="input" type="number" min={1} value={l.quantity} onChange={(e) => setLine(i, "quantity", +e.target.value)} /></Field>
                 <Field label="Đơn giá" className="col-span-6 sm:col-span-3"><input className="input" type="number" min={0} step={1000} value={l.unitPrice} onChange={(e) => setLine(i, "unitPrice", +e.target.value)} /></Field>

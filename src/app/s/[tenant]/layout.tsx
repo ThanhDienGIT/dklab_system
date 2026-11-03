@@ -17,21 +17,23 @@ async function Chrome({ params, children }: { params: Promise<{ tenant: string }
   const t = await getTenantCached(key);
   if (!t || t.status !== "active") notFound();
   const c = t.settings.contact ?? {};
-  const brand = t.settings.brand?.primaryColor ?? "#0e7490";
+  const brand = t.settings.brand?.primaryColor ?? "#0369a1";
   return (
     <div style={{ "--brand": brand } as React.CSSProperties} className="flex min-h-dvh flex-col bg-white">
-      <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur">
+      <div className="scroll-progress fixed inset-x-0 top-0 z-50 h-0.5 bg-gradient-to-r from-sky-500 via-orange-500 to-emerald-500" aria-hidden />
+      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/75 backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
           <Link href="/" className="flex items-center gap-2 font-bold">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white">{t.name[0]}</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-brand text-white shadow-md shadow-sky-500/30">{t.name[0]}</span>
             <span className="text-lg">{t.name}</span>
           </Link>
           <nav className="ml-auto hidden items-center gap-6 text-sm font-medium text-slate-600 sm:flex">
-            <Link href="/#tours" className="hover:text-brand">Tour</Link>
-            <Link href="/#lien-he" className="hover:text-brand">Liên hệ</Link>
+            <Link href="/#tours" className="transition hover:text-brand">Tour</Link>
+            <Link href="/#tu-van" className="transition hover:text-brand">Tư vấn</Link>
+            <Link href="/#lien-he" className="transition hover:text-brand">Liên hệ</Link>
           </nav>
           {(c.hotline || c.phone) && (
-            <a href={`tel:${(c.hotline || c.phone)!.replace(/\s/g, "")}`} className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white sm:ml-0">
+            <a data-guide="hotline" href={`tel:${(c.hotline || c.phone)!.replace(/\s/g, "")}`} className="pulse-ring ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-full bg-orange-600 px-4 text-sm font-semibold text-slate-950 transition hover:bg-orange-500 sm:ml-0">
               <Phone size={15} /> {c.hotline || c.phone}
             </a>
           )}

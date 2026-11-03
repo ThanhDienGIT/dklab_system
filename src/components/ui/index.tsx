@@ -31,10 +31,14 @@ export function Button({ variant = "primary", size = "md", loading, className, c
   );
 }
 
-export function Field({ label, error, children, className, hint }: { label: string; error?: string; children: ReactNode; className?: string; hint?: string }) {
+export function Field({ label, error, children, className, hint, required }: { label: string; error?: string; children: ReactNode; className?: string; hint?: string; required?: boolean }) {
   return (
     <label className={cx("block", className)}>
-      <span className="label">{label}</span>
+      <span className="label">
+        {label}
+        {required && <span className="ml-0.5 text-rose-600" aria-hidden>*</span>}
+        {required && <span className="sr-only"> (bắt buộc)</span>}
+      </span>
       {children}
       {hint && !error && <span className="mt-1 block text-xs text-slate-400">{hint}</span>}
       {error && <span className="mt-1 block text-xs text-rose-600">{error}</span>}

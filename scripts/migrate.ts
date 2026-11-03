@@ -43,7 +43,7 @@ async function seedTenant() {
         name: "Du Lịch Demo",
         industry: "travel",
         settings: {
-          brand: { primaryColor: "#0e7490", tagline: "Hành trình trọn vẹn – Giá minh bạch – Hỗ trợ 24/7" },
+          brand: { primaryColor: "#0369a1", tagline: "Hành trình trọn vẹn – Giá minh bạch – Hỗ trợ 24/7" },
           contact: { phone: "0901234567", hotline: "1900 0000", email: "booking@dulichdemo.vn", address: "123 Nguyễn Huệ, Quận 1, TP.HCM", zalo: "0901234567" },
           company: { legalName: "Công ty TNHH Du Lịch Demo", taxCode: "0312345678", address: "123 Nguyễn Huệ, Quận 1, TP.HCM" },
           invoice: { prefix: "DL", defaultVatRate: 8 },

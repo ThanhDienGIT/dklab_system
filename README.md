@@ -5,9 +5,13 @@ Mỗi khách hàng có domain riêng, phân quyền riêng, website đặt chỗ
 
 > Tenant demo: **`dulich_demo`** (Du Lịch Demo): 6 tour, lịch khởi hành, 4 tài khoản nhân viên.
 
-| Website khách | Đặt tour | Lễ tân tiếp nhận | Hóa đơn + VietQR + MISA |
+| Trang chủ (3D, animation) | Hướng dẫn từng bước | Gợi ý trường bắt buộc | Mobile |
 |---|---|---|---|
-| ![](docs/screenshots/home.png) | ![](docs/screenshots/tour.png) | ![](docs/screenshots/bookings.png) | ![](docs/screenshots/invoice.png) |
+| ![](docs/screenshots/home.png) | ![](docs/screenshots/tour.png) | ![](docs/screenshots/form.png) | ![](docs/screenshots/mobile.png) |
+
+| Lễ tân tiếp nhận | Hóa đơn + VietQR + MISA | Phân quyền |
+|---|---|---|
+| ![](docs/screenshots/bookings.png) | ![](docs/screenshots/invoice.png) | ![](docs/screenshots/roles.png) |
 
 ## Công nghệ
 
@@ -61,15 +65,46 @@ src/
 
 ## Bảo mật & JWT
 
-- **Access token** JWT HS256, sống 15 phút, gửi qua cookie `httpOnly; Secure; SameSite=Lax` (web) hoặc `Authorization: Bearer` (mobile/POS, dùng `returnTokens: true` khi login).
-  - Claims: `sub`, `tid` (tenant), `aud=tenant:<slug>` (chặn dùng chéo tenant), `sid`, `tv`, `perms`, `roles`.
-- **Refresh token** ngẫu nhiên 256-bit, DB chỉ lưu SHA-256, sống 30 ngày, cookie `path=/api/auth; SameSite=Strict`.
-  - **Xoay vòng mỗi lần refresh**. Token cũ bị dùng lại sau 30 giây ân hạn thì thu hồi cả phiên (phát hiện đánh cắp).
-- Khóa tài khoản / đặt lại mật khẩu: thu hồi mọi phiên ngay. Đổi vai trò có hiệu lực ở lần refresh kế tiếp (≤ 15 phút).
-- Mật khẩu argon2id (tham số OWASP). Khóa 15 phút sau 5 lần sai. Thời gian phản hồi cân bằng để không dò được tài khoản có tồn tại hay không.
-- Quyền dạng `module.resource.action[:scope]`, kiểm tra ở **server**. Ẩn nút trên giao diện chỉ là phụ.
-- Mật khẩu MISA lưu mã hóa AES-256-GCM. API không bao giờ trả về.
-- Form public có honeypot + giới hạn tần suất theo IP. Production nên chuyển sang Upstash/Redis.
+**Xác thực**
+- Access token: JWT HS256, sống 15 phút, gửi qua cookie `httpOnly; Secure; SameSite=Lax` (web) hoặc `Authorization: Bearer` (mobile/POS).
+- Refresh token: chuỗi ngẫu nhiên 256-bit, DB chỉ lưu SHA-256, xoay vòng mỗi lần dùng, phát hiện token bị dùng lại.
+- **Thu hồi tức thì**: mỗi request kiểm tra phiên còn hiệu lực, `tokenVersion`, trạng thái user và tenant (cache 15 giây). Đăng xuất, khóa tài khoản, đổi mật khẩu hay đổi quyền đều làm token cũ mất hiệu lực ngay.
+- Mật khẩu argon2id. Rate limit đăng nhập theo IP (20 lần / 10 phút) và theo tài khoản + IP (8 lần / 15 phút), nên kẻ xấu ở IP khác không khóa được tài khoản của bạn. Ghi nhật ký cả đăng nhập thành công lẫn thất bại.
+
+**Phân quyền & cách ly tenant**
+- Quyền `module.resource.action[:own|branch|tenant]`, kiểm tra ở server.
+- **Chống leo thang**: người không phải Chủ chỉ trao được quyền mình đang có; không ai ngoài Chủ sửa hoặc gán được vai trò Chủ.
+- **Chống IDOR chéo tenant**: mọi ID nhận từ client (tour, lịch khởi hành, khách, user, chi nhánh) đều qua `assertOwned()`. Tham số `[id]` bắt buộc là UUID.
+- Domain riêng phải **xác minh bằng DNS TXT** mới được định tuyến. Subdomain nền tảng chỉ định tuyến theo slug.
+
+**Web**
+- CSRF: kiểm tra `Origin` trong `proxy.ts`, bắt buộc `Content-Type: application/json`, giới hạn kích thước body.
+- Header: CSP (`connect-src 'self'`, `frame-ancestors 'none'`), HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy.
+- MISA: chỉ gọi `https://*.meinvoice.vn`, không theo redirect (chống SSRF). Đổi nơi gửi hoặc tài khoản MISA phải nhập lại mật khẩu. Mật khẩu lưu AES-256-GCM.
+- Form public: honeypot + rate limit theo IP và theo SĐT/email. Màu, URL ảnh được kiểm tra định dạng.
+- `DEMO_MODE=1` mới hiện tài khoản demo và cho đổi tenant bằng `?tenant=`. Production từ chối chạy với `APP_SECRET` mẫu.
+
+**Kiểm thử bảo mật**: `npm run test:security` chạy 29 kịch bản tấn công thật qua HTTP (chiếm domain, SSRF, IDOR, leo quyền, CSRF, thu hồi token, brute force, header). Kết quả hiện tại: 29/29 bị chặn.
+
+> Trên Vercel nên cấu hình `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (gói miễn phí) để rate limit đúng trên mọi instance.
+> Tự host: đặt nginx/Caddy ghi đè header `X-Real-IP`.
+
+## Giao diện website
+
+- Design system: xanh trời `#0369a1` + cam `#EA580C` cho nút hành động, font Be Vietnam Pro.
+- **3D & animation nhẹ, không thêm thư viện**:
+  - Hero có 3 "bưu thiếp" tour trong không gian 3D (CSS perspective) lơ lửng và nghiêng theo chuột.
+  - Thẻ tour nghiêng 3D + ánh sáng theo con trỏ; nội dung hiện dần khi cuộn; số liệu đếm động.
+  - Thanh tiến trình đọc trang dùng CSS scroll-timeline.
+  - Tất cả tắt khi bật *giảm chuyển động* (`prefers-reduced-motion`).
+- **Hướng dẫn sử dụng** (`<Guide>`):
+  - Có ở trang chủ, trang tour và trang Đặt chỗ của lễ tân.
+  - Làm nổi bật từng phần, có Quay lại / Tiếp / Bỏ qua, phím ← → Esc. Tự mở ở lần ghé đầu, mở lại bằng nút "Hướng dẫn".
+- **Gợi ý trường bắt buộc**:
+  - Khung "Thông tin bắt buộc" có thanh tiến độ; ô bắt buộc có dấu `*`.
+  - Lỗi hiện ngay dưới ô khi rời ô (`aria-describedby`). Gửi khi còn thiếu thì form rung nhẹ và con trỏ nhảy tới ô đầu tiên cần sửa. Dòng "Còn thiếu: …" ngay dưới nút gửi.
+- Lọc tour theo số ngày / giá, tìm kiếm không dấu. Thanh "Đặt tour" cố định trên mobile.
+- Bản landing page tham khảo dựng bằng 8B: https://mcp.8b.com/p/l61cosyrvo
 
 ## Tốc độ / cache
 
@@ -109,10 +144,12 @@ npm run dev
    - `DEFAULT_TENANT=dulich_demo`
    - `ROOT_DOMAIN`: domain gốc của bạn, vd `dklab.vn`
    - `SEED_ADMIN_PASSWORD`: mật khẩu cho tài khoản demo
+   - `DEMO_MODE=1` chỉ cho bản demo (không bật cho khách thật)
+   - (khuyến nghị) `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
 4. Deploy. Lệnh `npm run build` tự chạy migrate + seed (idempotent) rồi `next build`.
 5. Domain:
    - Truy cập `*.vercel.app` thì vào tenant mặc định.
-   - Domain riêng của khách: thêm domain vào project Vercel → trỏ DNS theo hướng dẫn → khai báo domain trong **Admin → Cài đặt → Tên miền**.
+   - Domain riêng của khách: thêm domain vào project Vercel → trỏ DNS theo hướng dẫn → khai báo trong **Admin → Cài đặt → Tên miền** → thêm bản ghi TXT được hiển thị → bấm **Xác minh**.
    - Subdomain kiểu `<khach>.dklab.vn`: thêm wildcard `*.dklab.vn` vào Vercel (cần dùng nameserver của Vercel).
 
 ## MISA meInvoice

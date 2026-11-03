@@ -3,6 +3,7 @@ import { CalendarDays, Mail, MessageCircle, PhoneCall, Plus, Receipt, Search, Tr
 import Link from "next/link";
 import { useState } from "react";
 import { usePerm } from "@/components/admin/AdminShell";
+import { Guide, type GuideStep } from "@/components/Guide";
 import { BOOKING_STATUS } from "@/components/admin/status";
 import { Badge, Button, cx, Empty, Field, Modal, PageHeader, Skeleton, useToast } from "@/components/ui";
 import { dateVN, telHref, timeAgo, vnd, zaloHref } from "@/lib/format";
@@ -12,6 +13,13 @@ import { setBookingFilter } from "@/store/store";
 import type { Booking, BookingStatus } from "@/store/types";
 
 const TABS = ["new", "contacted", "confirmed", "completed", "cancelled", "all"] as const;
+
+const GUIDE: GuideStep[] = [
+  { target: "tabs", title: "Lọc theo trạng thái", body: "“Mới – chờ gọi” là khách vừa gửi yêu cầu từ website. Danh sách tự làm mới mỗi 30 giây." },
+  { target: "call", title: "Gọi khách ngay", body: "Bấm số điện thoại để gọi (trên điện thoại) hoặc nhắn Zalo. Khách để lại SĐT là để được gọi xác nhận." },
+  { target: "actions", title: "Cập nhật trạng thái", body: "Đã gọi → “Đã gọi / đang tư vấn”. Khách đồng ý → “Xác nhận giữ chỗ” (hệ thống mới trừ chỗ). Sau đó “Lập hóa đơn” để gửi QR thanh toán." },
+  { target: "add", title: "Khách gọi điện đặt?", body: "Bấm nút này để tự thêm đặt chỗ. Ô có dấu * là bắt buộc; cần ít nhất SĐT hoặc email." },
+];
 
 export default function BookingsPage() {
   const dispatch = useAppDispatch();
@@ -28,10 +36,10 @@ export default function BookingsPage() {
       <PageHeader
         title={`Danh sách ${me?.labels.booking.toLowerCase() ?? "đặt chỗ"}`}
         desc="Khách để lại SĐT/email trên website → lễ tân gọi xác nhận thì mới giữ chỗ"
-        actions={can("booking.handle") && <Button onClick={() => setCreating(true)}><Plus size={16} /> Thêm đặt chỗ (khách gọi)</Button>}
+        actions={can("booking.handle") && <Button data-guide="add" onClick={() => setCreating(true)}><Plus size={16} /> Thêm đặt chỗ (khách gọi)</Button>}
       />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex gap-1 overflow-x-auto rounded-lg bg-slate-200/60 p-1">
+        <div data-guide="tabs" className="flex gap-1 overflow-x-auto rounded-lg bg-slate-200/60 p-1">
           {TABS.map((t) => (
             <button
               key={t}
@@ -55,15 +63,16 @@ export default function BookingsPage() {
         <Empty>Không có yêu cầu nào{status !== "all" ? ` ở trạng thái "${BOOKING_STATUS[status]?.label}"` : ""}.</Empty>
       ) : (
         <div className={cx("grid gap-3 md:grid-cols-2", isFetching && "opacity-70")}>
-          {data.items.map((b) => <BookingCard key={b.id} b={b} />)}
+          {data.items.map((b, i) => <BookingCard key={b.id} b={b} first={i === 0} />)}
         </div>
       )}
       <CreateBookingModal open={creating} onClose={() => setCreating(false)} />
+      <Guide steps={GUIDE} storageKey="admin-bookings" />
     </>
   );
 }
 
-function BookingCard({ b }: { b: Booking }) {
+function BookingCard({ b, first }: { b: Booking; first?: boolean }) {
   const [update, { isLoading }] = useUpdateBookingMutation();
   const [del] = useDeleteBookingMutation();
   const [noteOpen, setNoteOpen] = useState(false);
@@ -92,7 +101,7 @@ function BookingCard({ b }: { b: Booking }) {
 
       <div className="mt-3 flex flex-wrap gap-2">
         {b.phone ? (
-          <a href={telHref(b.phone)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700">
+          <a data-guide={first ? "call" : undefined} href={telHref(b.phone)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700">
             <PhoneCall size={15} /> {b.phone}
           </a>
         ) : (
@@ -121,7 +130,7 @@ function BookingCard({ b }: { b: Booking }) {
       {b.assigneeName && <p className="mt-2 text-xs text-slate-500">Người xử lý: {b.assigneeName}</p>}
 
       {can("booking.handle") && (
-        <div className="mt-3 flex flex-wrap gap-1.5 border-t pt-3">
+        <div data-guide={first ? "actions" : undefined} className="mt-3 flex flex-wrap gap-1.5 border-t pt-3">
           {b.status === "new" && <Button size="sm" variant="secondary" loading={isLoading} onClick={() => setStatus("contacted")}>Đã gọi / đang tư vấn</Button>}
           {(b.status === "new" || b.status === "contacted") && <Button size="sm" variant="success" loading={isLoading} onClick={() => setStatus("confirmed")}>Xác nhận giữ chỗ</Button>}
           {b.status === "confirmed" && <Button size="sm" variant="secondary" onClick={() => setStatus("completed")}>Hoàn tất</Button>}
@@ -195,8 +204,8 @@ function CreateBookingModal({ open, onClose }: { open: boolean; onClose: () => v
   return (
     <Modal open={open} onClose={onClose} title="Thêm đặt chỗ" footer={<><Button variant="secondary" onClick={onClose}>Đóng</Button><Button loading={isLoading} onClick={submit}>Lưu</Button></>}>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Họ tên khách *" className="sm:col-span-2"><input className="input" value={f.fullName} onChange={(e) => set("fullName", e.target.value)} /></Field>
-        <Field label="Số điện thoại (ưu tiên)"><input className="input" inputMode="tel" value={f.phone} onChange={(e) => set("phone", e.target.value)} /></Field>
+        <Field required label="Họ tên khách" className="sm:col-span-2"><input className="input" value={f.fullName} onChange={(e) => set("fullName", e.target.value)} /></Field>
+        <Field label="Số điện thoại (ưu tiên)" hint="Cần SĐT hoặc email"><input className="input" inputMode="tel" value={f.phone} onChange={(e) => set("phone", e.target.value)} /></Field>
         <Field label="Email"><input className="input" type="email" value={f.email} onChange={(e) => set("email", e.target.value)} /></Field>
         <Field label="Tour" className="sm:col-span-2">
           <select className="input" value={f.resourceId} onChange={(e) => setF((s) => ({ ...s, resourceId: e.target.value, slotId: "" }))}>

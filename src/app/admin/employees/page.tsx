@@ -70,8 +70,8 @@ function EmployeeForm({ value, branches, onClose }: { value: Partial<Employee>; 
   return (
     <Modal open onClose={onClose} title={value.id ? "Sửa nhân viên" : "Thêm nhân viên"} footer={<Button loading={isLoading} onClick={submit}>Lưu</Button>}>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Mã NV *"><input className="input" {...b("code")} /></Field>
-        <Field label="Họ tên *"><input className="input" {...b("fullName")} /></Field>
+        <Field required label="Mã NV"><input className="input" {...b("code")} /></Field>
+        <Field required label="Họ tên"><input className="input" {...b("fullName")} /></Field>
         <Field label="SĐT"><input className="input" {...b("phone")} /></Field>
         <Field label="Email"><input className="input" {...b("email")} /></Field>
         <Field label="Chức vụ"><input className="input" {...b("position")} /></Field>

@@ -65,7 +65,7 @@ function CustomerForm({ value, onClose }: { value: Partial<Customer>; onClose: (
   return (
     <Modal open onClose={onClose} title={value.id ? "Sửa khách hàng" : "Thêm khách hàng"} footer={<Button loading={isLoading} onClick={submit}>Lưu</Button>}>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Họ tên *" className="sm:col-span-2"><input className="input" {...b("fullName")} /></Field>
+        <Field required label="Họ tên" className="sm:col-span-2"><input className="input" {...b("fullName")} /></Field>
         <Field label="Số điện thoại"><input className="input" {...b("phone")} /></Field>
         <Field label="Email"><input className="input" {...b("email")} /></Field>
         <Field label="MST (xuất hóa đơn)"><input className="input" {...b("taxCode")} /></Field>

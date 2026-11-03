@@ -46,3 +46,86 @@ body {
   body { background: white; }
   .print-area { box-shadow: none !important; border: none !important; }
 }
+
+/* ───────────── Motion system (website public) ─────────────
+ * Thời lượng 300–600ms, easing mềm; tất cả tắt khi người dùng bật "giảm chuyển động". */
+:root {
+  --accent: #ea580c;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Hiện dần khi cuộn tới (component <Reveal>) */
+[data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0) scale(0.98);
+  transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+[data-reveal][data-shown="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Thẻ nghiêng 3D theo con trỏ (component <Tilt>) */
+.tilt {
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(0);
+  transition: transform 0.4s var(--ease-out), box-shadow 0.4s var(--ease-out);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.tilt:hover { box-shadow: 0 24px 48px -16px rgb(15 23 42 / 0.28); }
+.tilt .tilt-pop { transform: translateZ(28px); }
+.tilt .tilt-glare {
+  background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgb(255 255 255 / 0.35), transparent 55%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.tilt:hover .tilt-glare { opacity: 1; }
+
+/* Hero 3D: bưu thiếp bay lơ lửng */
+@keyframes float-a { 0%, 100% { transform: translate3d(0, 0, 0) } 50% { transform: translate3d(0, -14px, 0) } }
+@keyframes float-b { 0%, 100% { transform: translate3d(0, 0, 0) } 50% { transform: translate3d(0, 12px, 0) } }
+@keyframes spin-slow { to { transform: rotateX(72deg) rotateZ(360deg) } }
+@keyframes shimmer { to { background-position: 200% 0 } }
+@keyframes shake { 10%, 90% { transform: translateX(-1px) } 20%, 80% { transform: translateX(3px) } 30%, 50%, 70% { transform: translateX(-6px) } 40%, 60% { transform: translateX(6px) } }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.94) translateY(6px) } to { opacity: 1; transform: none } }
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgb(234 88 12 / 0.55) } 100% { box-shadow: 0 0 0 14px rgb(234 88 12 / 0) } }
+.float-a { animation: float-a 7s ease-in-out infinite; }
+.float-b { animation: float-b 8s ease-in-out infinite; }
+.orbit { animation: spin-slow 40s linear infinite; transform: rotateX(72deg); }
+.shake { animation: shake 0.5s both; }
+.pop-in { animation: pop-in 0.35s var(--ease-out) both; }
+.pulse-ring { animation: pulse-ring 1.8s var(--ease-out) infinite; }
+.text-shimmer {
+  background: linear-gradient(90deg, #fff 0%, #fde68a 25%, #fff 50%, #bae6fd 75%, #fff 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 8s linear infinite;
+}
+
+/* Thanh tiến trình đọc trang (CSS scroll-driven, không cần JS) */
+.scroll-progress { transform-origin: 0 50%; transform: scaleX(0); }
+@supports (animation-timeline: scroll()) {
+  .scroll-progress { animation: grow-x linear both; animation-timeline: scroll(root); }
+}
+@keyframes grow-x { to { transform: scaleX(1) } }
+
+/* Focus rõ ràng cho bàn phím */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand) 55%, white);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  [data-reveal] { opacity: 1; transform: none; }
+  .tilt { transform: none !important; }
+}

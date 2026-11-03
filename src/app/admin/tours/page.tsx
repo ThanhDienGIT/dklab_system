@@ -75,7 +75,7 @@ function TourForm({ value, onClose }: { value: Partial<Tour>; onClose: () => voi
         <Button loading={isLoading} onClick={submit}>Lưu</Button>
       </>}>
       <div className="grid gap-3 sm:grid-cols-6">
-        <Field label="Tên tour *" className="sm:col-span-4"><input className="input" {...b("title")} onBlur={() => !f.slug && setF((s) => ({ ...s, slug: slugify(s.title ?? "") }))} /></Field>
+        <Field required label="Tên tour" className="sm:col-span-4"><input className="input" {...b("title")} onBlur={() => !f.slug && setF((s) => ({ ...s, slug: slugify(s.title ?? "") }))} /></Field>
         <Field label="Slug (URL)" className="sm:col-span-2"><input className="input" {...b("slug")} /></Field>
         <Field label="Điểm đến" className="sm:col-span-2"><input className="input" {...b("location")} /></Field>
         <Field label="Khởi hành từ" className="sm:col-span-2"><input className="input" {...b("departFrom")} /></Field>
