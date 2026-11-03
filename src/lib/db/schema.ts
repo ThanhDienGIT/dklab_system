@@ -52,6 +52,8 @@ export const tenantDomains = pgTable("tenant_domains", {
   tenantId: tenantId(),
   domain: text("domain").notNull().unique(),
   isPrimary: boolean("is_primary").notNull().default(false),
+  /** Giá trị bản ghi TXT _dklab-verify.<domain> phải khớp để chứng minh sở hữu domain. */
+  verifyToken: text("verify_token"),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
   createdAt: createdAt(),
 });

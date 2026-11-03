@@ -1,9 +1,10 @@
 import { and, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
-import { audit, ok, parseBody, withAuth } from "@/lib/api";
+import { ApiError, audit, ok, parseBody, withAuth } from "@/lib/api";
 import { db, schema } from "@/lib/db";
 import { shortCode } from "@/lib/services/codes";
 import { upsertCustomer } from "@/lib/services/customers";
+import { assertOwned } from "@/lib/services/guard";
 import { emailSchema, optionalText, phoneSchema } from "@/lib/validators";
 
 const B = schema.bookingRequests;
@@ -69,6 +70,16 @@ const CreateBody = z
 
 export const POST = withAuth("booking.handle", async (req, ctx) => {
   const b = await parseBody(req, CreateBody);
+  // Mọi ID từ client phải thuộc tenant hiện tại (chống IDOR chéo tenant)
+  if (b.resourceType === "tour") {
+    await assertOwned(schema.tours, b.resourceId, ctx.tid);
+    if (b.slotId) {
+      if (!b.resourceId) throw new ApiError(422, "Chọn tour trước khi chọn ngày khởi hành");
+      await assertOwned(schema.tourDepartures, b.slotId, ctx.tid, eq(schema.tourDepartures.tourId, b.resourceId));
+    }
+  } else if (b.resourceId || b.slotId) {
+    throw new ApiError(422, "Loại đặt chỗ này chưa hỗ trợ chọn tài nguyên");
+  }
   let label = b.resourceLabel ?? null;
   if (b.resourceType === "tour" && b.resourceId && !label) {
     const [t] = await db.select({ title: schema.tours.title }).from(schema.tours).where(and(eq(schema.tours.id, b.resourceId), eq(schema.tours.tenantId, ctx.tid)));

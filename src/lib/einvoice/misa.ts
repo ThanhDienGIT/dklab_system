@@ -143,10 +143,23 @@ export function buildOriginalInvoiceData(cfg: MisaConfig, inv: MisaInvoiceInput)
 }
 
 /* ─────────────────────────────── Client ─────────────────────────────── */
+/** Chống SSRF: chỉ cho phép gọi HTTPS tới máy chủ của MISA. Dùng cả khi lưu cấu hình và khi gọi. */
+export function isAllowedMisaUrl(u: string): boolean {
+  try {
+    const url = new URL(u);
+    const h = url.hostname.toLowerCase();
+    return url.protocol === "https:" && !url.username && !url.password && (h === "meinvoice.vn" || h.endsWith(".meinvoice.vn")) && (!url.port || url.port === "443");
+  } catch {
+    return false;
+  }
+}
+
 function hosts(cfg: MisaConfig) {
   if (cfg.env === "mock") throw new Error("mock");
   const h = HOSTS[cfg.env];
-  return { auth: cfg.baseUrl ? `${cfg.baseUrl.replace(/\/$/, "")}` : h.auth, api: cfg.baseUrl ? cfg.baseUrl.replace(/\/$/, "") : h.api };
+  const custom = cfg.baseUrl?.replace(/\/$/, "");
+  if (custom && !isAllowedMisaUrl(custom)) throw new Error("Base URL MISA không hợp lệ (chỉ chấp nhận https://*.meinvoice.vn)");
+  return { auth: custom || h.auth, api: custom || h.api };
 }
 
 function parseData<T>(env: MisaEnvelope): T | null {
@@ -164,13 +177,22 @@ async function post(url: string, body: unknown, headers: Record<string, string> 
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(20_000),
     cache: "no-store",
+    redirect: "error", // không đi theo redirect sang host khác (chống SSRF vòng)
   });
   const text = await res.text();
   try {
     return JSON.parse(text) as MisaEnvelope;
   } catch {
-    return { Success: false, ErrorCode: `HTTP_${res.status}`, Errors: [text.slice(0, 300)] };
+    // Không trả nội dung phản hồi lạ ra ngoài (tránh lộ dữ liệu nội bộ)
+    return { Success: false, ErrorCode: `HTTP_${res.status}`, Errors: [] };
   }
+}
+
+/** Lỗi mạng/fetch: chỉ trả thông điệp chung, không lộ địa chỉ / chi tiết nội bộ */
+function safeErr(e: unknown): string {
+  const m = (e as Error)?.message ?? "";
+  if (m.startsWith("Lấy token MISA") || m.startsWith("Chưa cấu hình") || m.startsWith("Base URL MISA")) return m;
+  return "Không kết nối được tới MISA, vui lòng thử lại";
 }
 
 const errMsg = (e: MisaEnvelope) =>
@@ -195,7 +217,7 @@ export async function misaTestConnection(cfg: MisaConfig): Promise<MisaResult> {
     await misaGetToken(cfg);
     return { ok: true, message: "Kết nối MISA thành công" };
   } catch (e) {
-    return { ok: false, message: (e as Error).message };
+    return { ok: false, message: safeErr(e) };
   }
 }
 
@@ -221,7 +243,7 @@ export async function misaCreateInvoice(cfg: MisaConfig, inv: MisaInvoiceInput):
     if (!r.Success || !item || item.ErrorCode) return { ok: false, message: item?.ErrorCode || errMsg(r) };
     return { ok: true, transactionId: item.TransactionID, xml: item.InvoiceData, invSeries: cfg.invSeries, message: "Đã tạo hóa đơn trên MISA, chờ ký số" };
   } catch (e) {
-    return { ok: false, message: (e as Error).message };
+    return { ok: false, message: safeErr(e) };
   }
 }
 
@@ -257,6 +279,6 @@ export async function misaPublishInvoice(
     if (!r.Success || !item || item.ErrorCode) return { ok: false, message: item?.ErrorCode || errMsg(r) };
     return { ok: true, transactionId: p.transactionId, invNo: item.InvNo, invCode: item.InvCode, invSeries: item.InvSeries, invDate: item.InvDate, message: "Đã phát hành hóa đơn điện tử" };
   } catch (e) {
-    return { ok: false, message: (e as Error).message };
+    return { ok: false, message: safeErr(e) };
   }
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { emailSchema, money, optionalText, phoneSchema } from "./validators";
+import { emailSchema, httpsUrl, money, optionalText, phoneSchema } from "./validators";
 
 export const CustomerBody = z
   .object({
@@ -45,7 +45,7 @@ export const TourBody = z.object({
   durationNights: z.coerce.number().int().min(0).max(60).default(0),
   basePrice: money.default(0),
   childPrice: money.default(0),
-  imageUrl: optionalText(1000),
+  imageUrl: httpsUrl.optional().nullable(),
   highlights: z.array(z.string().trim().max(200)).max(20).default([]),
   itinerary: z.array(z.object({ day: z.string().max(40), title: z.string().max(200), detail: z.string().max(4000) })).max(60).default([]),
   isPublished: z.boolean().default(true),

@@ -1,0 +1,1 @@
+ALTER TABLE "tenant_domains" ADD COLUMN "verify_token" text;

@@ -6,6 +6,7 @@ import { toTransferText } from "@/lib/payments/vietqr";
 import { InvoiceBody } from "@/lib/schemas";
 import { shortCode } from "@/lib/services/codes";
 import { computeInvoice } from "@/lib/services/invoices";
+import { assertOwned } from "@/lib/services/guard";
 
 const I = schema.invoices;
 
@@ -31,6 +32,7 @@ export const POST = withAuth("invoice.create", async (req, ctx) => {
   const calc = computeInvoice(b.items);
   const prefix = tenant.settings.invoice?.prefix || "HD";
 
+  await assertOwned(schema.customers, b.customerId, ctx.tid);
   let customerId = b.customerId ?? null;
   if (b.bookingId) {
     const [bk] = await db.select().from(schema.bookingRequests).where(and(eq(schema.bookingRequests.id, b.bookingId), eq(schema.bookingRequests.tenantId, ctx.tid)));

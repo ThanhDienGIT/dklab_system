@@ -5,12 +5,14 @@ import { encrypt } from "@/lib/crypto";
 import { db, schema } from "@/lib/db";
 import { invalidateTenant } from "@/lib/services/cache";
 import { findBank } from "@/lib/payments/vietqr";
+import { isAllowedMisaUrl } from "@/lib/einvoice/misa";
+import { hexColor, httpsUrl } from "@/lib/validators";
 
 const s = (max = 300) => z.string().trim().max(max).optional();
 
 const Body = z.object({
   name: z.string().trim().min(2).max(120),
-  brand: z.object({ primaryColor: s(20), logoUrl: s(1000), tagline: s(200), heroImage: s(1000) }).default({}),
+  brand: z.object({ primaryColor: hexColor.optional(), logoUrl: httpsUrl.optional(), tagline: s(200), heroImage: httpsUrl.optional() }).default({}),
   contact: z.object({ phone: s(30), hotline: s(30), email: s(120), address: s(300), zalo: s(60) }).default({}),
   company: z.object({ legalName: s(200), taxCode: s(20), address: s(300) }).default({}),
   invoice: z.object({ prefix: z.string().trim().regex(/^[A-Z0-9]{0,6}$/, "Tiền tố chỉ gồm A-Z, 0-9 (≤6)").optional(), defaultVatRate: z.coerce.number().int().optional() }).default({}),
@@ -38,10 +40,25 @@ const Body = z.object({
       invSeries: s(20),
       invoiceTemplateId: s(100),
       withCode: z.boolean().optional(),
-      baseUrl: s(300),
+      baseUrl: z
+        .string()
+        .trim()
+        .max(300)
+        .refine((v) => v === "" || isAllowedMisaUrl(v), "Base URL MISA chỉ chấp nhận https://*.meinvoice.vn")
+        .optional(),
     })
     .optional(),
 });
+
+/**
+ * Đổi nơi gửi / tài khoản MISA (env, baseUrl, appId, MST, username) mà không nhập lại mật khẩu
+ * => xóa mật khẩu cũ. Chặn kiểu tấn công đổi đích đến để server gửi mật khẩu đã lưu cho kẻ xấu.
+ */
+function keepPassword(prev: schema.MisaConfig | undefined, next: Partial<schema.MisaConfig>) {
+  if (!prev?.passwordEnc) return undefined;
+  const same = (k: keyof schema.MisaConfig) => (prev[k] || "") === (next[k] || "");
+  return same("env") && same("baseUrl") && same("appId") && same("taxCode") && same("username") ? prev.passwordEnc : undefined;
+}
 
 function redact(settings: schema.TenantSettings) {
   const { misa, ...rest } = settings;
@@ -69,7 +86,7 @@ export const PUT = withAuth("settings.manage", async (req, ctx) => {
       bankName: findBank(a.bankBin)?.short ?? a.bankBin,
       isDefault: a.isDefault ?? i === 0,
     })),
-    misa: { ...misaRest, passwordEnc: password ? encrypt(password) : prev.misa?.passwordEnc },
+    misa: { ...misaRest, baseUrl: misaRest.baseUrl || undefined, passwordEnc: password ? encrypt(password) : keepPassword(prev.misa, misaRest) },
   };
   await db.update(schema.tenants).set({ name: b.name, settings }).where(eq(schema.tenants.id, ctx.tid));
   invalidateTenant();

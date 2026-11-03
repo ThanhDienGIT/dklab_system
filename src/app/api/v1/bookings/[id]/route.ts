@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ApiError, audit, ok, parseBody, withAuth } from "@/lib/api";
 import { db, schema } from "@/lib/db";
 import { optionalText } from "@/lib/validators";
+import { assertOwned } from "@/lib/services/guard";
 
 const B = schema.bookingRequests;
 const D = schema.tourDepartures;
@@ -35,18 +36,20 @@ const Patch = z.object({
 });
 
 /** Chiếm / trả chỗ của lịch khởi hành khi xác nhận / hủy (khóa dòng để tránh bán vượt số chỗ). */
-async function adjustSeats(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], slotId: string, delta: number) {
-  const [dep] = await tx.select().from(D).where(eq(D.id, slotId)).for("update");
+async function adjustSeats(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], tid: string, slotId: string, delta: number) {
+  // Luôn lọc theo tenant: không bao giờ sửa lịch khởi hành của doanh nghiệp khác
+  const [dep] = await tx.select().from(D).where(and(eq(D.id, slotId), eq(D.tenantId, tid))).for("update");
   if (!dep) return;
   if (delta > 0 && dep.seatsBooked + delta > dep.seatsTotal)
     throw new ApiError(409, `Không đủ chỗ: lịch này còn ${dep.seatsTotal - dep.seatsBooked} chỗ`);
-  await tx.update(D).set({ seatsBooked: sql`greatest(0, ${D.seatsBooked} + ${delta})` }).where(eq(D.id, slotId));
+  await tx.update(D).set({ seatsBooked: sql`greatest(0, ${D.seatsBooked} + ${delta})` }).where(and(eq(D.id, slotId), eq(D.tenantId, tid)));
 }
 
 export const PATCH = withAuth<{ id: string }>("booking.handle", async (req, ctx, { id }) => {
   const body = await parseBody(req, Patch);
   const cur = await load(ctx.tid, id);
   if (ctx.scope === "own" && cur.assignedTo !== ctx.sub) throw new ApiError(403, "Yêu cầu này không được giao cho bạn");
+  await assertOwned(schema.users, body.assignedTo, ctx.tid);
 
   const holdsSeat = (s: string) => s === "confirmed" || s === "completed";
   const nextStatus = body.status ?? cur.status;
@@ -57,7 +60,7 @@ export const PATCH = withAuth<{ id: string }>("booking.handle", async (req, ctx,
     if (cur.slotId) {
       const before = holdsSeat(cur.status) ? oldParty : 0;
       const after = holdsSeat(nextStatus) ? party : 0;
-      if (after !== before) await adjustSeats(tx, cur.slotId, after - before);
+      if (after !== before) await adjustSeats(tx, ctx.tid, cur.slotId, after - before);
     }
     const [r] = await tx
       .update(B)
@@ -79,7 +82,7 @@ export const PATCH = withAuth<{ id: string }>("booking.handle", async (req, ctx,
 export const DELETE = withAuth<{ id: string }>("booking.delete", async (_req, ctx, { id }) => {
   const cur = await load(ctx.tid, id);
   await db.transaction(async (tx) => {
-    if (cur.slotId && (cur.status === "confirmed" || cur.status === "completed")) await adjustSeats(tx, cur.slotId, -(cur.adults + cur.children));
+    if (cur.slotId && (cur.status === "confirmed" || cur.status === "completed")) await adjustSeats(tx, ctx.tid, cur.slotId, -(cur.adults + cur.children));
     await tx.delete(B).where(eq(B.id, id));
   });
   await audit(ctx, "booking.delete", "booking", id, { code: cur.code });

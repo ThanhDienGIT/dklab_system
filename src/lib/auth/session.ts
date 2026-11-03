@@ -17,7 +17,7 @@ let dummyHash: Promise<string> | null = null;
 const getDummyHash = () => (dummyHash ??= hashPassword("dummy-password-for-timing"));
 import { ApiError } from "../api";
 
-const MAX_FAILED = 5;
+const MAX_FAILED = 10; // khóa cứng chỉ là lớp cuối; rate limit theo IP + tài khoản chặn trước
 const LOCK_MINUTES = 15;
 /** Trong khoảng này, refresh token cũ bị gửi lại (vd: 2 tab cùng refresh) không bị coi là tấn công. */
 const ROTATION_GRACE_MS = 30_000;

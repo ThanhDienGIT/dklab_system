@@ -76,7 +76,7 @@ export type SettingsData = {
     misa?: MisaSettings;
   };
 };
-export type Domain = { id: string; domain: string; isPrimary: boolean; verifiedAt: string | null; createdAt: string };
+export type Domain = { id: string; domain: string; isPrimary: boolean; verifiedAt: string | null; createdAt: string; txtName: string; txtValue: string | null };
 export type AuditRow = { id: string; action: string; entity: string; entityId: string | null; data: unknown; ip: string | null; createdAt: string; userName: string | null };
 export type Dashboard = {
   bookings: { newCount: number; contacted: number; confirmed30: number; total30: number };

@@ -4,14 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Button, Field } from "@/components/ui";
 
-const DEMO = [
-  { email: "admin@dulichdemo.vn", role: "Chủ doanh nghiệp (toàn quyền)" },
-  { email: "letan@dulichdemo.vn", role: "Lễ tân – tiếp nhận đặt chỗ" },
-  { email: "ketoan@dulichdemo.vn", role: "Kế toán – hóa đơn, MISA" },
-  { email: "hdv@dulichdemo.vn", role: "Nhân viên – chỉ việc được giao" },
-];
+export type DemoAccount = { email: string; role: string };
 
-export function LoginForm() {
+export function LoginForm({ demo }: { demo: DemoAccount[] | null }) {
   const router = useRouter();
   const sp = useSearchParams();
   const [identifier, setIdentifier] = useState("");
@@ -58,10 +53,10 @@ export function LoginForm() {
           Đăng nhập
         </Button>
       </form>
-      <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white/70 p-4 text-xs text-slate-600">
+      {demo && demo.length > 0 && <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white/70 p-4 text-xs text-slate-600">
         <p className="mb-2 font-medium">Tài khoản demo (mật khẩu: Admin@123)</p>
         <ul className="space-y-1">
-          {DEMO.map((d) => (
+          {demo.map((d) => (
             <li key={d.email}>
               <button type="button" className="text-brand hover:underline" onClick={() => { setIdentifier(d.email); setPassword("Admin@123"); }}>
                 {d.email}
@@ -70,7 +65,7 @@ export function LoginForm() {
             </li>
           ))}
         </ul>
-      </div>
+      </div>}
     </div>
   );
 }

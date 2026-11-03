@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { cacheLife, cacheTag } from "next/cache";
 import { db, schema } from "./db";
 import { DEFAULT_TENANT, ROOT_DOMAIN } from "./env";
@@ -38,20 +38,22 @@ async function findTenant(key: string): Promise<PublicTenant | null> {
   };
   if (key.startsWith("~")) {
     const host = key.slice(1);
+    // Subdomain của nền tảng: CHỈ định tuyến theo slug (không tra bảng domain => không ai chiếm được)
+    if (host.endsWith(`.${ROOT_DOMAIN}`)) {
+      const sub = host.slice(0, -(ROOT_DOMAIN.length + 1));
+      if (!/^[a-z0-9-]{1,63}$/.test(sub)) return null;
+      return (await findTenant(sub)) ?? (await findTenant(sub.replace(/-/g, "_")));
+    }
+    // Domain riêng: chỉ khi đã xác minh sở hữu qua DNS TXT
     const [byDomain] = await db
       .select(cols)
       .from(schema.tenantDomains)
       .innerJoin(schema.tenants, eq(schema.tenants.id, schema.tenantDomains.tenantId))
-      .where(eq(schema.tenantDomains.domain, host))
+      .where(and(eq(schema.tenantDomains.domain, host), isNotNull(schema.tenantDomains.verifiedAt)))
       .limit(1);
-    if (byDomain) return byDomain;
-    // <sub>.ROOT_DOMAIN chưa đăng ký domain: thử theo slug (dulich-demo => dulich_demo)
-    if (host.endsWith(`.${ROOT_DOMAIN}`)) {
-      const sub = host.slice(0, -(ROOT_DOMAIN.length + 1));
-      return (await findTenant(sub)) ?? (await findTenant(sub.replace(/-/g, "_")));
-    }
-    return null;
+    return byDomain ?? null;
   }
+  if (!/^[a-z0-9_-]{1,63}$/.test(key)) return null;
   const [t] = await db.select(cols).from(schema.tenants).where(eq(schema.tenants.slug, key)).limit(1);
   return t ?? null;
 }

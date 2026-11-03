@@ -170,6 +170,7 @@ export const api = createApi({
       query: (body) => ({ url: "/v1/domains", method: "POST", body }),
       invalidatesTags: ["Domain"],
     }),
+    verifyDomain: b.mutation<{ verified: boolean }, string>({ query: (id) => ({ url: `/v1/domains/${id}/verify`, method: "POST" }), invalidatesTags: ["Domain"] }),
     deleteDomain: b.mutation<Id, string>({ query: (id) => ({ url: `/v1/domains/${id}`, method: "DELETE" }), invalidatesTags: ["Domain"] }),
 
     audit: b.query<T.AuditRow[], void>({ query: () => "/v1/audit", providesTags: ["Audit"] }),
@@ -184,6 +185,6 @@ export const {
   useUsersQuery, useCreateUserMutation, useUpdateUserMutation, useSaveRoleMutation, useDeleteRoleMutation,
   useToursQuery, useTourQuery, useSaveTourMutation, useDeleteTourMutation, useSaveDepartureMutation, useDeleteDepartureMutation,
   useInvoicesQuery, useInvoiceQuery, useCreateInvoiceMutation, useAddPaymentMutation, useCancelInvoiceMutation, useEinvoiceMutation,
-  useSettingsQuery, useSaveSettingsMutation, useMisaTestMutation, useDomainsQuery, useAddDomainMutation, useDeleteDomainMutation,
+  useSettingsQuery, useSaveSettingsMutation, useMisaTestMutation, useDomainsQuery, useAddDomainMutation, useVerifyDomainMutation, useDeleteDomainMutation,
   useAuditQuery,
 } = api;

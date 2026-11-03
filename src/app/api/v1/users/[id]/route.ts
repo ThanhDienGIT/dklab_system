@@ -1,10 +1,10 @@
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { ApiError, audit, ok, parseBody, withAuth } from "@/lib/api";
+import { ApiError, audit, invalidateAuthCache, ok, parseBody, withAuth } from "@/lib/api";
 import { hashPassword, validatePasswordStrength } from "@/lib/auth/password";
 import { revokeAllSessions } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
-import { assertRolesInTenant } from "@/lib/services/users";
+import { assertCanAssignRoles, assertCanManageUser } from "@/lib/services/users";
 
 const U = schema.users;
 const Patch = z.object({
@@ -19,7 +19,8 @@ export const PATCH = withAuth<{ id: string }>("users.manage", async (req, ctx, {
   const [u] = await db.select({ id: U.id }).from(U).where(and(eq(U.id, id), eq(U.tenantId, ctx.tid)));
   if (!u) throw new ApiError(404, "Không tìm thấy tài khoản");
   if (id === ctx.sub && (b.status === "disabled" || b.roleIds)) throw new ApiError(422, "Không thể tự khóa hoặc tự đổi vai trò của chính mình");
-  if (b.roleIds) await assertRolesInTenant(ctx.tid, b.roleIds);
+  await assertCanManageUser(ctx, id);
+  if (b.roleIds) await assertCanAssignRoles(ctx, b.roleIds);
   let passwordHash: string | undefined;
   if (b.password) {
     const weak = validatePasswordStrength(b.password);
@@ -44,6 +45,8 @@ export const PATCH = withAuth<{ id: string }>("users.manage", async (req, ctx, {
   // Khóa tài khoản / đặt lại mật khẩu: đăng xuất khỏi mọi thiết bị.
   // Đổi vai trò: quyền mới áp dụng ở lần refresh token kế tiếp (tối đa 15 phút).
   if (b.status === "disabled" || passwordHash) await revokeAllSessions(id);
+  invalidateAuthCache(); // tokenVersion đã tăng => token cũ bị từ chối ngay
+
   await audit(ctx, "user.update", "user", id, { status: b.status, roleIds: b.roleIds, passwordReset: !!passwordHash });
   return ok({ id });
 });

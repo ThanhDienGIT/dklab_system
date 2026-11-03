@@ -8,6 +8,29 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 const DEFAULT_TENANT = process.env.DEFAULT_TENANT || "dulich_demo";
 const ROOT_DOMAIN = process.env.ROOT_DOMAIN || "dklab.vn";
+/** Chỉ bản demo mới cho đổi tenant bằng ?tenant= trên domain dùng chung */
+const DEMO_MODE = process.env.DEMO_MODE === "1";
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * Chống CSRF cho API dùng cookie: request ghi (POST/PATCH/DELETE…) phải có Origin trùng Host.
+ * - Origin khác host => 403 (kể cả subdomain cùng ROOT_DOMAIN, vì SameSite coi chúng là "cùng site")
+ * - Không có Origin: chỉ chấp nhận khi KHÔNG mang cookie đăng nhập (app mobile / server gọi bằng Bearer)
+ */
+function csrfBlocked(req: NextRequest): boolean {
+  if (SAFE_METHODS.has(req.method)) return false;
+  const host = req.headers.get("host");
+  const origin = req.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).host !== host;
+    } catch {
+      return true;
+    }
+  }
+  const hasAuthCookie = req.cookies.has("dk_at") || req.cookies.has("dk_rt");
+  return hasAuthCookie && !req.headers.get("authorization");
+}
 
 function tenantKey(req: NextRequest): string {
   // Cho phép xem thử tenant khác trên domain demo: ?tenant=slug (lưu cookie)
@@ -15,7 +38,7 @@ function tenantKey(req: NextRequest): string {
   const fromCookie = req.cookies.get("dk_tenant")?.value;
   const host = (req.headers.get("host") ?? "").toLowerCase().split(":")[0];
   const isShared = !host || host === "localhost" || host.endsWith(".vercel.app") || /^\d+\.\d+\.\d+\.\d+$/.test(host) || host === ROOT_DOMAIN || host === `www.${ROOT_DOMAIN}`;
-  if (isShared) return fromQuery || fromCookie || DEFAULT_TENANT;
+  if (isShared) return (DEMO_MODE && (fromQuery || fromCookie)) || DEFAULT_TENANT;
   return `~${host}`;
 }
 
@@ -29,11 +52,14 @@ export function proxy(req: NextRequest) {
 
   const remember = (res: NextResponse) => {
     const q = searchParams.get("tenant");
-    if (q && /^[a-z0-9_-]{2,50}$/.test(q)) res.cookies.set("dk_tenant", q, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 30 });
+    if (DEMO_MODE && q && /^[a-z0-9_-]{2,50}$/.test(q)) res.cookies.set("dk_tenant", q, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 30 });
     return res;
   };
 
-  if (pathname.startsWith("/api/")) return NextResponse.next({ request: { headers } });
+  if (pathname.startsWith("/api/")) {
+    if (csrfBlocked(req)) return NextResponse.json({ ok: false, error: "Yêu cầu không hợp lệ (CSRF)" }, { status: 403 });
+    return NextResponse.next({ request: { headers } });
+  }
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     if (!req.cookies.get("dk_li")) {

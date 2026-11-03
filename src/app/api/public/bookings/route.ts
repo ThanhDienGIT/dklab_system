@@ -6,6 +6,7 @@ import { db, schema } from "@/lib/db";
 import { shortCode } from "@/lib/services/codes";
 import { upsertCustomer } from "@/lib/services/customers";
 import { getTenantFresh } from "@/lib/tenant";
+import { rateLimit } from "@/lib/ratelimit";
 import { emailSchema, optionalText, phoneSchema } from "@/lib/validators";
 
 /**
@@ -30,21 +31,16 @@ const Body = z
   })
   .refine((b) => b.phone || b.email, { message: "Vui lòng để lại số điện thoại hoặc email (ưu tiên số điện thoại)", path: ["phone"] });
 
-// Giới hạn tần suất đơn giản theo IP (mỗi instance). Production nên dùng Upstash/Redis.
-const hits = new Map<string, number[]>();
-function rateLimit(ip: string, max = 5, windowMs = 10 * 60_000) {
-  const now = Date.now();
-  const arr = (hits.get(ip) ?? []).filter((t) => now - t < windowMs);
-  if (arr.length >= max) throw new ApiError(429, "Bạn gửi quá nhiều yêu cầu, vui lòng thử lại sau ít phút hoặc gọi hotline");
-  arr.push(now);
-  hits.set(ip, arr);
-}
-
 export async function POST(req: NextRequest) {
   try {
-    rateLimit(clientIp(req) ?? "unknown");
-    const b = await parseBody(req, Body);
+    const ip = clientIp(req);
+    if (!(await rateLimit(`booking:ip:${ip}`, 5, 600)).ok)
+      throw new ApiError(429, "Bạn gửi quá nhiều yêu cầu, vui lòng thử lại sau ít phút hoặc gọi hotline");
+    const b = await parseBody(req, Body, 10_000);
     if (b.website) return ok({ code: "OK" }); // bot
+    const who = b.phone || b.email;
+    if (!(await rateLimit(`booking:who:${who}`, 5, 3600)).ok)
+      throw new ApiError(429, "Số điện thoại / email này đã gửi nhiều yêu cầu. Nhân viên sẽ liên hệ sớm, vui lòng chờ");
     const tenant = await getTenantFresh(req.headers.get("x-tenant-key") ?? "");
     if (!tenant || tenant.status !== "active") throw new ApiError(404, "Không tìm thấy doanh nghiệp");
 

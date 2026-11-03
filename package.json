@@ -10,7 +10,8 @@
     "build:app": "next build",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:security": "tsx scripts/security-test.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",

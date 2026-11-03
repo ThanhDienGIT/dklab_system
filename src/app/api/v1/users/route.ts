@@ -4,7 +4,7 @@ import { ApiError, audit, ok, parseBody, withAuth } from "@/lib/api";
 import { hashPassword, validatePasswordStrength } from "@/lib/auth/password";
 import { db, schema } from "@/lib/db";
 import { emailSchema, phoneSchema } from "@/lib/validators";
-import { assertRolesInTenant } from "@/lib/services/users";
+import { assertCanAssignRoles } from "@/lib/services/users";
 
 const U = schema.users;
 
@@ -43,7 +43,7 @@ export const POST = withAuth("users.manage", async (req, ctx) => {
   const b = await parseBody(req, Body);
   const weak = validatePasswordStrength(b.password);
   if (weak) throw new ApiError(422, weak);
-  await assertRolesInTenant(ctx.tid, b.roleIds);
+  await assertCanAssignRoles(ctx, b.roleIds);
   const conds = [b.email ? eq(U.email, b.email) : undefined, b.phone ? eq(U.phone, b.phone) : undefined].filter(Boolean);
   const [dup] = await db.select({ id: U.id }).from(U).where(and(eq(U.tenantId, ctx.tid), or(...conds)));
   if (dup) throw new ApiError(409, "Email hoặc SĐT đã được dùng cho tài khoản khác");

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { QR } from "@/components/QR";
 import { Badge, Button, Field, PageHeader, Skeleton, useToast } from "@/components/ui";
 import { BANKS, buildVietQR } from "@/lib/payments/vietqr";
-import { errorMessage, useAddDomainMutation, useDeleteDomainMutation, useDomainsQuery, useMisaTestMutation, useSaveSettingsMutation, useSettingsQuery } from "@/store/api";
+import { errorMessage, useAddDomainMutation, useDeleteDomainMutation, useVerifyDomainMutation, useDomainsQuery, useMisaTestMutation, useSaveSettingsMutation, useSettingsQuery } from "@/store/api";
 import type { BankAccount, MisaSettings, SettingsData } from "@/store/types";
 
 type S = SettingsData["settings"];
@@ -150,24 +150,44 @@ function SettingsForm({ data }: { data: SettingsData }) {
 function DomainsSection() {
   const { data } = useDomainsQuery();
   const [add, { isLoading }] = useAddDomainMutation();
+  const [verify, vState] = useVerifyDomainMutation();
   const [del] = useDeleteDomainMutation();
   const [domain, setDomain] = useState("");
   const toast = useToast();
   return (
     <section className="card space-y-3 p-4">
-      <h2 className="flex items-center gap-2 font-semibold"><Globe size={17} /> Tên miền</h2>
-      <p className="text-xs text-slate-500">Trỏ CNAME tên miền của bạn về <code>cname.vercel-dns.com</code> (hoặc IP server), thêm domain vào project Vercel, rồi khai báo tại đây để hệ thống nhận diện doanh nghiệp.</p>
+      <h2 className="flex items-center gap-2 font-semibold"><Globe size={17} /> Tên miền riêng</h2>
+      <ol className="list-decimal space-y-1 pl-5 text-xs text-slate-500">
+        <li>Thêm tên miền ở ô dưới.</li>
+        <li>Tại nhà cung cấp DNS: thêm bản ghi <b>TXT</b> như hiển thị (chứng minh bạn sở hữu domain) và trỏ <b>CNAME</b> về <code>cname.vercel-dns.com</code>.</li>
+        <li>Bấm <b>Xác minh</b>. Chỉ domain đã xác minh mới hiển thị website của bạn.</li>
+      </ol>
       <ul className="divide-y rounded-lg border">
         {data?.map((d) => (
-          <li key={d.id} className="flex items-center justify-between px-3 py-2 text-sm">
-            <span>{d.domain} {d.isPrimary && <Badge color="green">Chính</Badge>}</span>
-            <button className="p-1 text-slate-400 hover:text-rose-600" onClick={() => del(d.id)}><Trash2 size={15} /></button>
+          <li key={d.id} className="space-y-2 px-3 py-2.5 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium">{d.domain}</span>
+              <span className="flex items-center gap-2">
+                {d.verifiedAt ? <Badge color="green">Đã xác minh</Badge> : <Badge color="amber">Chờ xác minh</Badge>}
+                <button className="p-1 text-slate-400 hover:text-rose-600" aria-label={`Xóa ${d.domain}`} onClick={() => del(d.id)}><Trash2 size={15} /></button>
+              </span>
+            </div>
+            {!d.verifiedAt && d.txtValue && (
+              <div className="rounded-lg bg-slate-50 p-2 text-xs">
+                <div>Loại: <b>TXT</b> · Tên: <code className="select-all">{d.txtName}</code></div>
+                <div>Giá trị: <code className="select-all break-all">{d.txtValue}</code></div>
+                <Button size="sm" variant="secondary" className="mt-2" loading={vState.isLoading}
+                  onClick={async () => { try { await verify(d.id).unwrap(); toast("Đã xác minh tên miền"); } catch (e) { toast(errorMessage(e), "err"); } }}>
+                  Xác minh
+                </Button>
+              </div>
+            )}
           </li>
         ))}
         {!data?.length && <li className="px-3 py-2 text-sm text-slate-500">Chưa có tên miền riêng</li>}
       </ul>
-      <form className="flex gap-2" onSubmit={async (e) => { e.preventDefault(); try { await add({ domain }).unwrap(); setDomain(""); toast("Đã thêm tên miền"); } catch (er) { toast(errorMessage(er), "err"); } }}>
-        <input className="input" placeholder="vd: dulichabc.vn" value={domain} onChange={(e) => setDomain(e.target.value)} />
+      <form className="flex gap-2" onSubmit={async (e) => { e.preventDefault(); try { await add({ domain }).unwrap(); setDomain(""); toast("Đã thêm, hãy thêm bản ghi TXT để xác minh"); } catch (er) { toast(errorMessage(er), "err"); } }}>
+        <input className="input" placeholder="vd: dulichabc.vn" aria-label="Tên miền mới" value={domain} onChange={(e) => setDomain(e.target.value)} />
         <Button loading={isLoading}>Thêm</Button>
       </form>
     </section>
