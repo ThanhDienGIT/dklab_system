@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
 import { dbEnvNames, resolveDatabaseUrl } from "@/lib/db/url";
+import { siteDefaultTenant } from "@/site.config";
 
 /**
  * Tự chẩn đoán cấu hình khi deploy (Vercel / VPS).
@@ -42,7 +43,7 @@ export async function GET() {
     const [{ t }] = (await db.execute(sql`select to_regclass('public.tenants') is not null as t`)) as unknown as { t: boolean }[];
     add("Bảng dữ liệu (migration)", t, "Chưa có bảng: DB được gắn sau lần build. Vào Deployments → Redeploy (bỏ chọn 'Use existing Build Cache') để chạy migrate + seed");
     if (t) {
-      const slug = process.env.DEFAULT_TENANT || "dulich_demo";
+      const slug = siteDefaultTenant();
       const [{ n }] = (await db.execute(sql`select count(*)::int as n from users u join tenants t on t.id = u.tenant_id where t.slug = ${slug}`)) as unknown as { n: number }[];
       add(`Dữ liệu demo (tenant ${slug})`, n > 0, "Chưa có tài khoản: Redeploy để seed, hoặc chạy 'npm run db:migrate' với DATABASE_URL của Neon");
     }

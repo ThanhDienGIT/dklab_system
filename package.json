@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "test:security": "tsx scripts/security-test.ts",
     "plugins": "tsx scripts/gen-plugins.ts",
-    "plugin:new": "tsx scripts/new-plugin.ts"
+    "plugin:new": "tsx scripts/new-plugin.ts",
+    "tenant:new": "tsx scripts/tenant-new.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",

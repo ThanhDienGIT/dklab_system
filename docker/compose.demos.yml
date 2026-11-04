@@ -1,0 +1,67 @@
+# Nhiều site demo — MỖI NGÀNH 1 website riêng, 1 image dùng chung, 1 PostgreSQL (mỗi site 1 database, tự tạo).
+#
+#   export APP_SECRET="$(openssl rand -base64 48)"
+#   docker compose -f docker/compose.demos.yml up -d --build
+#
+#   Du lịch :3001 · Spa :3002 · Cà phê :3003 · Nhà hàng :3004 · Khách sạn :3005 · Kế toán :3006
+# Trỏ domain (vd spa.demo.dklab.vn) về từng cổng bằng Caddy/Nginx — xem docs/DEPLOY.md.
+# PLUGINS ở đây giới hạn dữ liệu demo + danh sách tài khoản mẫu của từng site.
+x-demo: &demo
+  image: dklab:latest
+  pull_policy: never # image build tại chỗ, không kéo từ registry
+  restart: unless-stopped
+  depends_on:
+    db: { condition: service_healthy }
+
+x-env: &env
+  APP_SECRET: ${APP_SECRET:?Hay dat APP_SECRET}
+  ROOT_DOMAIN: ${ROOT_DOMAIN:-dklab.vn}
+  DEMO_MODE: "1"
+  SEED: "1"
+  COOKIE_SECURE: ${COOKIE_SECURE:-}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dklab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dklab}
+      POSTGRES_DB: postgres
+    volumes: [dklab_demos_pg:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U dklab"], interval: 5s, retries: 20 }
+
+  travel:
+    <<: *demo
+    pull_policy: build
+    build: { context: .. } # chỉ build 1 lần, các site khác dùng lại image dklab:latest
+    environment: { <<: *env, PLUGINS: travel, DEFAULT_TENANT: dulich_demo, DATABASE_URL: "postgres://dklab:${POSTGRES_PASSWORD:-dklab}@db:5432/demo_travel" }
+    ports: ["3001:3000"]
+  spa:
+    <<: *demo
+    depends_on: { db: { condition: service_healthy }, travel: { condition: service_started } }
+    environment: { <<: *env, PLUGINS: spa, DEFAULT_TENANT: spa_demo, DATABASE_URL: "postgres://dklab:${POSTGRES_PASSWORD:-dklab}@db:5432/demo_spa" }
+    ports: ["3002:3000"]
+  cafe:
+    <<: *demo
+    depends_on: { db: { condition: service_healthy }, travel: { condition: service_started } }
+    environment: { <<: *env, PLUGINS: cafe, DEFAULT_TENANT: cafe_demo, DATABASE_URL: "postgres://dklab:${POSTGRES_PASSWORD:-dklab}@db:5432/demo_cafe" }
+    ports: ["3003:3000"]
+  restaurant:
+    <<: *demo
+    depends_on: { db: { condition: service_healthy }, travel: { condition: service_started } }
+    environment: { <<: *env, PLUGINS: restaurant, DEFAULT_TENANT: nhahang_demo, DATABASE_URL: "postgres://dklab:${POSTGRES_PASSWORD:-dklab}@db:5432/demo_restaurant" }
+    ports: ["3004:3000"]
+  hotel:
+    <<: *demo
+    depends_on: { db: { condition: service_healthy }, travel: { condition: service_started } }
+    environment: { <<: *env, PLUGINS: hotel, DEFAULT_TENANT: khachsan_demo, DATABASE_URL: "postgres://dklab:${POSTGRES_PASSWORD:-dklab}@db:5432/demo_hotel" }
+    ports: ["3005:3000"]
+  accounting:
+    <<: *demo
+    depends_on: { db: { condition: service_healthy }, travel: { condition: service_started } }
+    environment: { <<: *env, PLUGINS: accounting, DEFAULT_TENANT: ketoan_demo, DATABASE_URL: "postgres://dklab:${POSTGRES_PASSWORD:-dklab}@db:5432/demo_accounting" }
+    ports: ["3006:3000"]
+
+volumes:
+  dklab_demos_pg:

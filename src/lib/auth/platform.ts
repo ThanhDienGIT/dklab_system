@@ -75,7 +75,8 @@ export async function platformAudit(ctx: Pick<PlatformCtx, "sub" | "ip">, action
   await db.insert(schema.platformAuditLogs).values({ adminId: ctx.sub, action, tenantId: tenantId ?? null, data: (data ?? null) as object, ip: ctx.ip });
 }
 
-const secure = process.env.NODE_ENV === "production";
+// COOKIE_SECURE=0 chỉ dùng khi thử nghiệm qua http://IP trong mạng nội bộ (production thật luôn chạy HTTPS)
+const secure = process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE !== "0" : process.env.NODE_ENV === "production";
 export function setPlatformCookies(res: NextResponse, token: string) {
   res.cookies.set(PLATFORM_COOKIE, token, { httpOnly: true, secure, sameSite: "strict", path: "/", maxAge: TTL });
   res.cookies.set("dk_pli", "1", { httpOnly: true, secure, sameSite: "strict", path: "/superdklab", maxAge: TTL });

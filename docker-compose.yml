@@ -1,19 +1,45 @@
-# PostgreSQL local cho phát triển:  docker compose up -d
-# DATABASE_URL=postgres://dklab:dklab@localhost:5432/dklab  →  npm run db:setup
+# DKLab — chạy toàn bộ hệ thống bằng Docker (web + PostgreSQL)
+#
+#   cp .env.docker.example .env.docker     # sửa APP_SECRET, mật khẩu, ngành…
+#   docker compose up -d --build
+#   → http://localhost:3000   (quản trị: /admin · Super Admin: /superdklab)
+#
+# Chỉ cần PostgreSQL cho dev:  docker compose up -d db
+#   DATABASE_URL=postgres://dklab:dklab@localhost:5432/dklab npm run db:setup && npm run dev
 services:
   db:
-    image: postgres:16-alpine   # alpine đã kèm btree_gist
+    image: postgres:16-alpine # đã kèm extension btree_gist
     restart: unless-stopped
     environment:
-      POSTGRES_USER: dklab
-      POSTGRES_PASSWORD: dklab
-      POSTGRES_DB: dklab
+      POSTGRES_USER: ${POSTGRES_USER:-dklab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dklab}
+      POSTGRES_DB: ${POSTGRES_DB:-dklab}
       TZ: Asia/Ho_Chi_Minh
-    ports: ["5432:5432"]
+    ports: ["127.0.0.1:${DB_PORT:-5432}:5432"]
     volumes: [dklab_pg:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dklab"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 5s
-      retries: 10
+      retries: 20
+
+  app:
+    build:
+      context: .
+      args:
+        PLUGINS: ${PLUGINS:-} # vd PLUGINS=spa => image chỉ chứa ngành spa
+    image: dklab:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    env_file:
+      - path: .env.docker
+        required: false
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-dklab}:${POSTGRES_PASSWORD:-dklab}@db:5432/${POSTGRES_DB:-dklab}
+    ports: ["${APP_PORT:-3000}:3000"]
+    # Bản sao lưu (docker compose exec app node dist/db-backup.mjs) — lấy ra máy: docker compose cp app:/app/backups ./backups
+    volumes: [dklab_backups:/app/backups]
+
 volumes:
   dklab_pg:
+  dklab_backups:

@@ -30,6 +30,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Docker/VPS: NEXT_OUTPUT=standalone => .next/standalone chạy bằng `node server.js`, không cần node_modules đầy đủ
+  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,

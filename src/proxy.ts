@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { siteDefaultTenant, siteDemoMode } from "./site.config";
 
 /**
  * Proxy (Next.js 16, thay cho middleware):
@@ -6,10 +7,10 @@ import { NextResponse, type NextRequest } from "next/server";
  *  - Gắn header x-tenant-key cho API (đăng nhập, đặt chỗ public)
  *  - Chặn /admin khi chưa đăng nhập (xác thực JWT thật sự nằm ở API)
  */
-const DEFAULT_TENANT = process.env.DEFAULT_TENANT || "dulich_demo";
+const DEFAULT_TENANT = siteDefaultTenant();
 const ROOT_DOMAIN = process.env.ROOT_DOMAIN || "dklab.vn";
 /** Chỉ bản demo mới cho đổi tenant bằng ?tenant= trên domain dùng chung */
-const DEMO_MODE = process.env.DEMO_MODE === "1";
+const DEMO_MODE = siteDemoMode();
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**

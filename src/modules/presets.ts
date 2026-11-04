@@ -64,5 +64,5 @@ export const DEFAULT_ROLES: RolePreset[] = [
 ];
 
 export function getPreset(key: string): IndustryPreset {
-  return INDUSTRY_PRESETS.find((p) => p.key === key) ?? INDUSTRY_PRESETS.find((p) => p.key === "travel")!;
+  return INDUSTRY_PRESETS.find((p) => p.key === key) ?? INDUSTRY_PRESETS.find((p) => p.key === "travel") ?? INDUSTRY_PRESETS[0];
 }

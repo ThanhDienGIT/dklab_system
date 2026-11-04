@@ -190,7 +190,8 @@ export async function revokeAllSessions(userId: string) {
   await db.update(schema.sessions).set({ revokedAt: new Date() }).where(and(eq(schema.sessions.userId, userId), isNull(schema.sessions.revokedAt)));
 }
 
-const secure = process.env.NODE_ENV === "production";
+// COOKIE_SECURE=0 chỉ dùng khi thử nghiệm qua http://IP trong mạng nội bộ (production thật luôn chạy HTTPS)
+const secure = process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE !== "0" : process.env.NODE_ENV === "production";
 
 export function setAuthCookies(res: NextResponse, t: { accessToken: string; refreshToken: string }) {
   res.cookies.set(ACCESS_COOKIE, t.accessToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: ACCESS_TTL_SEC });

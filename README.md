@@ -252,6 +252,20 @@ Chi tiết: [database/README.md](database/README.md).
 - Khi bật `DEMO_MODE=1`: xem website ngành khác bằng `/?tenant=spa_demo`. Trang `/login` có ô chọn doanh nghiệp demo.
 - Super Admin: `/superdklab` → `dklab` / `Dklab@123`.
 
+## Triển khai theo ngành / Docker
+
+Hướng dẫn đầy đủ: **[docs/DEPLOY.md](docs/DEPLOY.md)**.
+
+```bash
+docker compose up -d --build                                   # web + PostgreSQL (cấu hình: .env.docker)
+docker compose -f docker/compose.demos.yml up -d --build       # 6 site demo, mỗi ngành 1 cổng (3001–3006)
+npm run tenant:new -- --industry spa --slug spa_hoasen --name "Spa Hoa Sen" --email chu@spahoasen.vn --password MatKhau123
+```
+
+- **Chọn ngành:** `PLUGINS=spa` (lúc build, chỉ đóng gói ngành đó), `DEFAULT_TENANT` (doanh nghiệp hiện trên domain chung), `DEMO_MODE`.
+- **Khách thật 1 ngành:** khai báo `TENANT_SLUG/TENANT_NAME/TENANT_INDUSTRY/OWNER_EMAIL/OWNER_PASSWORD`. Lần chạy đầu container tự tạo doanh nghiệp.
+- **Nhánh demo:** `demo/travel`, `demo/spa`, `demo/cafe`, `demo/restaurant`, `demo/hotel`, `demo/accounting`. Mỗi nhánh chỉ khác ở `src/site.config.ts`, mỗi nhánh gắn 1 project Vercel. Đồng bộ từ nhánh chính bằng `bash scripts/sync-demo-branches.sh`.
+
 ## Deploy Vercel (demo)
 
 1. Import repo vào Vercel (Framework: Next.js).

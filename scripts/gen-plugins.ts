@@ -3,14 +3,24 @@
  *   src/plugins/_registry.ts  (manifest, dùng được ở client)
  *   src/plugins/_seeds.ts     (dữ liệu demo, chỉ dùng trong script seed)
  * Chạy tự động trước dev/build. Thêm ngành = thêm thư mục, không sửa code core.
+ *
+ * Chỉ đóng gói một số ngành:  PLUGINS=spa,cafe npm run build, hoặc SITE.plugins trong src/site.config.ts
  */
 import { existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { sitePlugins } from "../src/site.config";
 
 const dir = join(process.cwd(), "src/plugins");
-const keys = readdirSync(dir)
+const all = readdirSync(dir)
   .filter((d) => !d.startsWith("_") && statSync(join(dir, d)).isDirectory() && existsSync(join(dir, d, "manifest.ts")))
   .sort();
+const wanted = sitePlugins();
+const unknown = wanted.filter((k) => !all.includes(k));
+if (unknown.length) {
+  console.error(`✗ PLUGINS có ngành không tồn tại: ${unknown.join(", ")}. Có sẵn: ${all.join(", ")}`);
+  process.exit(1);
+}
+const keys = wanted.length ? all.filter((k) => wanted.includes(k)) : all;
 const id = (k: string) => k.replace(/[^a-zA-Z0-9]/g, "_");
 
 const header = "// ⚠️ File tự sinh bởi scripts/gen-plugins.ts — không sửa tay.\n";

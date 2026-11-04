@@ -1,4 +1,5 @@
 import "server-only";
+import { siteDefaultTenant, siteDemoMode } from "@/site.config";
 
 export function appSecret(): string {
   const s = process.env.APP_SECRET;
@@ -10,7 +11,7 @@ export function appSecret(): string {
   return s;
 }
 
-export const DEFAULT_TENANT = process.env.DEFAULT_TENANT || "dulich_demo";
+export const DEFAULT_TENANT = siteDefaultTenant();
 export const ROOT_DOMAIN = process.env.ROOT_DOMAIN || "dklab.vn";
 
-export const DEMO_MODE = process.env.DEMO_MODE === "1";
+export const DEMO_MODE = siteDemoMode();

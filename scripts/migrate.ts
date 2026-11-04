@@ -2,7 +2,9 @@
  * Chạy migration + seed dữ liệu demo (idempotent).
  * Tự chạy trong `npm run build` (Vercel) nếu có DATABASE_URL.
  *   npm run db:migrate          # migrate + seed
- *   SEED=0 npm run db:migrate   # chỉ migrate
+ *   SEED=0 npm run db:migrate   # chỉ migrate (không tạo dữ liệu demo)
+ * Triển khai 1 ngành: đặt TENANT_SLUG, TENANT_NAME, TENANT_INDUSTRY, OWNER_EMAIL, OWNER_PASSWORD
+ * (+ TENANT_DOMAINS, TENANT_PLAN, OWNER_NAME, OWNER_PHONE, TENANT_ADDRESS) => tự tạo doanh nghiệp lần đầu.
  */
 import { hash } from "@node-rs/argon2";
 import { and, eq } from "drizzle-orm";
@@ -15,6 +17,9 @@ import { DEMO_SEEDS } from "../src/plugins/_seeds";
 import type { DemoSeed } from "../src/plugins/types";
 import { tasksBetween } from "../src/lib/services/tax";
 import { ensureDatabase, mask, open, preflight } from "./lib/pg";
+import { ensureTenant, tenantFromEnv } from "./lib/tenant";
+import { INDUSTRY_PRESETS } from "../src/modules/presets";
+import { sitePlugins, TRAVEL_DEMO_SLUG } from "../src/site.config";
 
 const url = resolveDatabaseUrl();
 if (!url) {
@@ -32,7 +37,7 @@ const db = drizzle(client, { schema });
 const days = (n: number) => new Date(Date.now() + n * 86400_000).toISOString().slice(0, 10);
 
 async function seedTenant() {
-  const slug = process.env.DEFAULT_TENANT || "dulich_demo";
+  const slug = TRAVEL_DEMO_SLUG;
   const [exists] = await db.select({ id: schema.tenants.id }).from(schema.tenants).where(eq(schema.tenants.slug, slug));
   if (exists) {
     console.log(`✓ Tenant "${slug}" đã tồn tại, bỏ qua seed`);
@@ -284,9 +289,14 @@ async function seedPlatformAdmin() {
   await migrate(db, { migrationsFolder: "./drizzle" });
   console.log("✓ Migration xong");
   await seedPlatformAdmin();
+  const own = tenantFromEnv();
+  if (own) await ensureTenant(db, own);
   if (process.env.SEED !== "0") {
-    await seedTenant();
-    for (const x of DEMO_SEEDS) await seedIndustry(x.industry, x.demo);
+    // Dữ liệu demo chỉ cho các ngành được đóng gói (PLUGINS=...)
+    const only = sitePlugins(); // PLUGINS=spa => chỉ seed demo ngành spa (kể cả khi image chứa mọi ngành)
+    const want = (k: string) => INDUSTRY_PRESETS.some((p) => p.key === k) && (!only.length || only.includes(k));
+    if (want("travel")) await seedTenant();
+    for (const x of DEMO_SEEDS) if (want(x.industry)) await seedIndustry(x.industry, x.demo);
   }
   await client.end();
 })().catch(async (e) => {
