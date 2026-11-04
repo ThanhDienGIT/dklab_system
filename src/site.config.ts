@@ -9,9 +9,9 @@
  * Các nhánh demo/<ngành> chỉ khác nhánh chính ở đúng file này.
  */
 export const SITE = {
-  plugins: [] as string[],
-  defaultTenant: "",
-  demoMode: false,
+  plugins: ["spa"] as string[],
+  defaultTenant: "spa_demo",
+  demoMode: true,
 };
 
 export const siteDefaultTenant = () => process.env.DEFAULT_TENANT || SITE.defaultTenant || "dulich_demo";
