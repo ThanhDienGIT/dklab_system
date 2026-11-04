@@ -117,6 +117,8 @@ export const sessions = pgTable(
     refreshHash: text("refresh_hash").notNull(),
     /** Hash của refresh token vừa bị xoay: nếu bị dùng lại => nghi đánh cắp, thu hồi phiên. */
     previousHash: text("previous_hash"),
+    /** Super Admin đăng nhập thay (id platform_admins) — giữ qua các lần refresh để hiện cảnh báo */
+    impersonatedBy: uuid("impersonated_by"),
     userAgent: text("user_agent"),
     ip: text("ip"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
@@ -288,6 +290,13 @@ export const bookingRequests = pgTable(
     status: text("status").notNull().default("new"),
     source: text("source").notNull().default("website"),
     estimatedTotal: money("estimated_total"),
+    /** Dịch vụ / loại phòng được chọn (engine slots/rooms) */
+    itemId: uuid("item_id"),
+    /** Khoảng thời gian đặt (engine slots/tables/rooms) */
+    startAt: timestamp("start_at", { withTimezone: true }),
+    endAt: timestamp("end_at", { withTimezone: true }),
+    /** Món đặt trước (nhà hàng): [{ itemId, name, qty, price }] */
+    items: jsonb("items").$type<{ itemId: string; name: string; qty: number; price: number }[]>(),
     customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
     assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "set null" }),
     staffNote: text("staff_note"),
@@ -407,6 +416,8 @@ export type TenantSettings = {
   bankAccounts?: BankAccount[];
   invoice?: { prefix?: string; defaultVatRate?: number };
   misa?: MisaConfig;
+  /** Ghi đè giờ mở cửa / bước giờ / thời lượng giữ bàn của ngành */
+  booking?: { open?: string; close?: string; step?: number; durationMin?: number };
 };
 
 export type EInvoiceData = {
@@ -422,3 +433,162 @@ export type EInvoiceData = {
   error?: string;
   history?: { at: string; action: string; ok: boolean; message?: string }[];
 };
+
+/* ═════════════ Động cơ dùng chung cho các ngành (plugin) ═════════════ */
+
+/** A. Danh mục: menu (cà phê/nhà hàng), dịch vụ (spa), loại phòng (khách sạn), gói (kế toán) */
+export const catalogCategories = pgTable("catalog_categories", {
+  id: id(),
+  tenantId: tenantId(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: createdAt(),
+});
+
+export const catalogItems = pgTable(
+  "catalog_items",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    categoryId: uuid("category_id").references(() => catalogCategories.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    price: money("price"),
+    /** Thời lượng dịch vụ (phút) — engine slots */
+    durationMin: integer("duration_min"),
+    /** Sức chứa (khách/phòng) — engine rooms */
+    capacity: integer("capacity"),
+    imageUrl: text("image_url"),
+    tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("catalog_items_tenant_idx").on(t.tenantId, t.categoryId)],
+);
+
+/** B. Tài nguyên: bàn, phòng, giường, nhân viên phục vụ. x/y/shape dùng cho sơ đồ. */
+export const resources = pgTable(
+  "resources",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    kind: text("kind").notNull(), // table | room | bed | staff
+    name: text("name").notNull(),
+    area: text("area"),
+    capacity: integer("capacity").notNull().default(1),
+    /** Phòng thuộc loại phòng nào (catalog item) */
+    itemId: uuid("item_id").references(() => catalogItems.id, { onDelete: "set null" }),
+    x: integer("x").notNull().default(0),
+    y: integer("y").notNull().default(0),
+    shape: text("shape").notNull().default("square"), // round | square | rect
+    /** Trạng thái buồng phòng (khách sạn): clean | dirty | maintenance */
+    housekeeping: text("housekeeping").notNull().default("clean"),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("resources_tenant_kind_idx").on(t.tenantId, t.kind)],
+);
+
+/**
+ * Giữ chỗ trên tài nguyên theo khoảng thời gian.
+ * Chống đặt trùng ở tầng DB bằng EXCLUDE USING gist (xem migration 0003_reservations_exclusion.sql).
+ */
+export const reservations = pgTable(
+  "reservations",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    resourceId: uuid("resource_id")
+      .notNull()
+      .references(() => resources.id, { onDelete: "cascade" }),
+    bookingId: uuid("booking_id").references(() => bookingRequests.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id").references(() => catalogItems.id, { onDelete: "set null" }),
+    startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+    endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+    /** pending (chờ gọi xác nhận, vẫn giữ chỗ) | confirmed | checked_in | completed | cancelled | no_show */
+    status: text("status").notNull().default("pending"),
+    partySize: integer("party_size").notNull().default(1),
+    /** Tên khách vãng lai (không có booking) */
+    label: text("label"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("reservations_tenant_time_idx").on(t.tenantId, t.startAt), index("reservations_booking_idx").on(t.bookingId)],
+);
+
+/* ═════════════ Kế toán: hợp đồng dịch vụ + lịch kê khai thuế ═════════════ */
+
+export const contracts = pgTable("contracts", {
+  id: id(),
+  tenantId: tenantId(),
+  customerId: uuid("customer_id")
+    .notNull()
+    .references(() => customers.id, { onDelete: "cascade" }),
+  itemId: uuid("item_id").references(() => catalogItems.id, { onDelete: "set null" }),
+  code: text("code").notNull(),
+  title: text("title").notNull(),
+  monthlyFee: money("monthly_fee"),
+  /** Kỳ kê khai GTGT của khách: monthly | quarterly */
+  taxPeriod: text("tax_period").notNull().default("quarterly"),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  status: text("status").notNull().default("active"), // active | paused | ended
+  /** Kỳ phí gần nhất đã lập hóa đơn, vd "2026-10" */
+  lastBilledPeriod: text("last_billed_period"),
+  note: text("note"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const taxTasks = pgTable(
+  "tax_tasks",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    contractId: uuid("contract_id")
+      .notNull()
+      .references(() => contracts.id, { onDelete: "cascade" }),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    /** vat | pit | cit_prov | cit_final | fs */
+    kind: text("kind").notNull(),
+    period: text("period").notNull(), // 2026-10 | 2026-Q3 | 2026
+    dueDate: date("due_date").notNull(),
+    status: text("status").notNull().default("pending"), // pending | done
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    note: text("note"),
+  },
+  (t) => [uniqueIndex("tax_tasks_uq").on(t.contractId, t.kind, t.period), index("tax_tasks_due_idx").on(t.tenantId, t.dueDate)],
+);
+
+/* ═════════════ Quản trị nền tảng (Super Admin) ═════════════ */
+
+export const platformAdmins = pgTable("platform_admins", {
+  id: id(),
+  username: text("username").notNull().unique(),
+  fullName: text("full_name").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  tokenVersion: integer("token_version").notNull().default(0),
+  failedLogins: integer("failed_logins").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+export const platformAuditLogs = pgTable(
+  "platform_audit_logs",
+  {
+    id: id(),
+    adminId: uuid("admin_id").references(() => platformAdmins.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    tenantId: uuid("tenant_id"),
+    data: jsonb("data"),
+    ip: text("ip"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("platform_audit_created_idx").on(t.createdAt)],
+);

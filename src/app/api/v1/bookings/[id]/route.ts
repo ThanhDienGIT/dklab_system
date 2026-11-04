@@ -5,6 +5,7 @@ import { ApiError, audit, ok, parseBody, withAuth } from "@/lib/api";
 import { db, schema } from "@/lib/db";
 import { optionalText } from "@/lib/validators";
 import { assertOwned } from "@/lib/services/guard";
+import { isOverlapError } from "@/lib/services/availability";
 
 const B = schema.bookingRequests;
 const D = schema.tourDepartures;
@@ -24,7 +25,17 @@ export const GET = withAuth<{ id: string }>("booking.view", async (_req, ctx, { 
     const [d] = b.slotId ? await db.select().from(D).where(eq(D.id, b.slotId)) : [];
     if (t) unitPrice = { adult: d?.price ?? t.basePrice, child: t.childPrice || (d?.price ?? t.basePrice) };
   }
-  return ok({ ...b, unitPrice });
+  // Gợi ý dòng hóa đơn cho các ngành dùng danh mục (dịch vụ / phòng / món đặt trước)
+  let lines: { itemName: string; unit: string; quantity: number; unitPrice: number }[] = [];
+  if (b.items?.length) lines = b.items.map((x) => ({ itemName: x.name, unit: "Phần", quantity: x.qty, unitPrice: x.price }));
+  else if (b.itemId) {
+    const [it] = await db.select().from(schema.catalogItems).where(and(eq(schema.catalogItems.id, b.itemId), eq(schema.catalogItems.tenantId, ctx.tid)));
+    if (it && b.resourceType === "room" && b.startAt && b.endAt) {
+      const nights = Math.max(1, Math.round((b.endAt.getTime() - b.startAt.getTime()) / 86400_000));
+      lines = [{ itemName: `${it.name} (${b.resourceLabel ?? ""})`, unit: "Đêm", quantity: nights, unitPrice: it.price }];
+    } else if (it) lines = [{ itemName: it.name, unit: "Lần", quantity: 1, unitPrice: it.price }];
+  }
+  return ok({ ...b, unitPrice, lines });
 });
 
 const Patch = z.object({
@@ -72,7 +83,18 @@ export const PATCH = withAuth<{ id: string }>("booking.handle", async (req, ctx,
       })
       .where(eq(B.id, id))
       .returning();
+    // Đồng bộ lượt giữ chỗ (bàn / phòng / KTV) theo trạng thái đặt chỗ
+    if (body.status && body.status !== cur.status) {
+      const map: Record<string, string> = { new: "pending", contacted: "pending", confirmed: "confirmed", completed: "completed", cancelled: "cancelled" };
+      await tx
+        .update(schema.reservations)
+        .set({ status: map[body.status] })
+        .where(and(eq(schema.reservations.bookingId, id), eq(schema.reservations.tenantId, ctx.tid)));
+    }
     return r;
+  }).catch((e) => {
+    if (isOverlapError(e)) throw new ApiError(409, "Khung giờ / chỗ này đã có khách khác giữ, không thể mở lại đặt chỗ");
+    throw e;
   });
   if (cur.slotId) revalidateTag(`tours:${ctx.tid}`, { expire: 0 });
   await audit(ctx, "booking.update", "booking", id, { from: cur.status, to: nextStatus, note: body.staffNote });

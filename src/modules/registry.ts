@@ -6,23 +6,13 @@
  * File này dùng được cả ở server lẫn client (không import gì từ server).
  */
 
+import { PLUGINS } from "@/plugins/_registry";
+import type { ModuleManifest } from "@/plugins/types";
+export type { ModuleManifest, NavItem, PermissionDef } from "@/plugins/types";
+
 export type Scope = "own" | "branch" | "tenant";
 
-export type PermissionDef = { key: string; label: string };
-
-export type NavItem = { href: string; label: string; icon: string; permission: string };
-
-export type ModuleManifest = {
-  key: string;
-  name: string;
-  description: string;
-  /** Module lõi luôn bật, không tắt được */
-  core?: boolean;
-  permissions: PermissionDef[];
-  nav: NavItem[];
-};
-
-export const MODULES: ModuleManifest[] = [
+const CORE_MODULES: ModuleManifest[] = [
   {
     key: "core",
     name: "Hệ thống",
@@ -90,18 +80,38 @@ export const MODULES: ModuleManifest[] = [
     nav: [{ href: "/admin/invoices", label: "Hóa đơn", icon: "receipt", permission: "invoice.view" }],
   },
   {
-    key: "tour",
-    name: "Du lịch – Tour",
-    description: "Tour, lịch khởi hành, số chỗ, giá người lớn / trẻ em",
+    key: "catalog",
+    name: "Danh mục (menu / dịch vụ / loại phòng)",
+    description: "Nhóm và mục: món, dịch vụ có thời lượng, loại phòng, gói dịch vụ; giá, ảnh",
     permissions: [
-      { key: "tour.view", label: "Xem tour" },
-      { key: "tour.manage", label: "Thêm / sửa tour & lịch khởi hành" },
+      { key: "catalog.view", label: "Xem danh mục" },
+      { key: "catalog.manage", label: "Thêm / sửa danh mục, giá" },
     ],
-    nav: [{ href: "/admin/tours", label: "Tour du lịch", icon: "map", permission: "tour.view" }],
+    nav: [{ href: "/admin/catalog", label: "Danh mục", icon: "list", permission: "catalog.view", labelKey: "catalogNav" }],
+  },
+  {
+    key: "resource",
+    name: "Tài nguyên (bàn / phòng / giường / nhân viên)",
+    description: "Sơ đồ bàn, phòng, giường, người phục vụ; trạng thái trống / đang dùng",
+    permissions: [
+      { key: "resource.view", label: "Xem sơ đồ & trạng thái" },
+      { key: "resource.manage", label: "Thêm / sửa / sắp xếp sơ đồ" },
+    ],
+    nav: [{ href: "/admin/resources", label: "Tài nguyên", icon: "grid", permission: "resource.view", labelKey: "resourceNav" }],
+  },
+  {
+    key: "schedule",
+    name: "Lịch",
+    description: "Lịch theo ngày: ai / bàn / phòng nào đang được đặt khung giờ nào",
+    permissions: [{ key: "schedule.view", label: "Xem lịch" }],
+    nav: [{ href: "/admin/schedule", label: "Lịch", icon: "calendar", permission: "schedule.view" }],
   },
   // Các module ngành khác (table, room, menu, spa-service) dùng chung engine booking_requests
   // và được bổ sung theo cùng khuôn manifest này.
 ];
+
+/** Module lõi + module do plugin ngành đóng góp (vd: tour, kế toán) */
+export const MODULES: ModuleManifest[] = [...CORE_MODULES, ...PLUGINS.flatMap((p) => p.modules ?? [])];
 
 export const ALL_PERMISSIONS = MODULES.flatMap((m) => m.permissions.map((p) => ({ ...p, module: m.key })));
 

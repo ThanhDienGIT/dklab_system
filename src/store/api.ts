@@ -66,7 +66,7 @@ export const api = createApi({
       return a.payload[reducerPath] as never;
     }
   },
-  tagTypes: ["Me", "Dashboard", "Booking", "Customer", "Employee", "User", "Role", "Tour", "Invoice", "Settings", "Domain", "Audit"],
+  tagTypes: ["Me", "Dashboard", "Booking", "Customer", "Employee", "User", "Role", "Tour", "Invoice", "Settings", "Domain", "Audit", "Catalog", "Resource", "Reservation", "Contract", "Tax"],
   endpoints: (b) => ({
     me: b.query<T.Me, void>({ query: () => "/auth/me", providesTags: ["Me"] }),
     dashboard: b.query<T.Dashboard, void>({ query: () => "/v1/dashboard", providesTags: ["Dashboard"] }),
@@ -75,7 +75,7 @@ export const api = createApi({
       query: (p) => ({ url: "/v1/bookings", params: p }),
       providesTags: ["Booking"],
     }),
-    booking: b.query<T.Booking & { unitPrice: { adult: number; child: number } | null }, string>({ query: (id) => `/v1/bookings/${id}`, providesTags: ["Booking"] }),
+    booking: b.query<T.Booking & { unitPrice: { adult: number; child: number } | null; lines: { itemName: string; unit: string; quantity: number; unitPrice: number }[] }, string>({ query: (id) => `/v1/bookings/${id}`, providesTags: ["Booking"] }),
     createBooking: b.mutation<T.Booking, Partial<T.Booking>>({
       query: (body) => ({ url: "/v1/bookings", method: "POST", body }),
       invalidatesTags: ["Booking", "Dashboard", "Customer"],
@@ -174,6 +174,64 @@ export const api = createApi({
     deleteDomain: b.mutation<Id, string>({ query: (id) => ({ url: `/v1/domains/${id}`, method: "DELETE" }), invalidatesTags: ["Domain"] }),
 
     audit: b.query<T.AuditRow[], void>({ query: () => "/v1/audit", providesTags: ["Audit"] }),
+
+    /* ── Danh mục ── */
+    catalog: b.query<{ categories: T.Category[]; items: T.CatalogItem[] }, void>({ query: () => "/v1/catalog", providesTags: ["Catalog"] }),
+    saveCategory: b.mutation<T.Category, Partial<T.Category>>({
+      query: ({ id, ...body }) => ({ url: id ? `/v1/catalog/categories/${id}` : "/v1/catalog/categories", method: id ? "PATCH" : "POST", body }),
+      invalidatesTags: ["Catalog"],
+    }),
+    deleteCategory: b.mutation<Id, string>({ query: (id) => ({ url: `/v1/catalog/categories/${id}`, method: "DELETE" }), invalidatesTags: ["Catalog"] }),
+    saveItem: b.mutation<T.CatalogItem, Partial<T.CatalogItem>>({
+      query: ({ id, ...body }) => ({ url: id ? `/v1/catalog/items/${id}` : "/v1/catalog/items", method: id ? "PATCH" : "POST", body }),
+      invalidatesTags: ["Catalog", "Resource"],
+    }),
+    deleteItem: b.mutation<Id, string>({ query: (id) => ({ url: `/v1/catalog/items/${id}`, method: "DELETE" }), invalidatesTags: ["Catalog"] }),
+
+    /* ── Tài nguyên & lịch ── */
+    resources: b.query<T.Resource[], void>({ query: () => "/v1/resources", providesTags: ["Resource"] }),
+    saveResource: b.mutation<T.Resource, Partial<T.Resource>>({
+      query: ({ id, current: _c, next: _n, ...body }) => ({ url: id ? `/v1/resources/${id}` : "/v1/resources", method: id ? "PATCH" : "POST", body }),
+      invalidatesTags: ["Resource"],
+    }),
+    deleteResource: b.mutation<Id, string>({ query: (id) => ({ url: `/v1/resources/${id}`, method: "DELETE" }), invalidatesTags: ["Resource"] }),
+    saveLayout: b.mutation<{ saved: number }, { items: { id: string; x: number; y: number }[] }>({
+      query: (body) => ({ url: "/v1/resources/layout", method: "PUT", body }),
+      invalidatesTags: ["Resource"],
+    }),
+    reservations: b.query<T.Reservation[], { date: string; days?: number }>({
+      query: (p) => ({ url: "/v1/reservations", params: p }),
+      providesTags: ["Reservation"],
+    }),
+    walkin: b.mutation<T.Reservation, { resourceId: string; durationMin?: number; partySize?: number; label?: string; itemId?: string | null; startAt?: string; status?: string }>({
+      query: (body) => ({ url: "/v1/reservations", method: "POST", body }),
+      invalidatesTags: ["Reservation", "Resource"],
+    }),
+    updateReservation: b.mutation<T.Reservation, Id & { status?: string; resourceId?: string; startAt?: string; endAt?: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/reservations/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["Reservation", "Resource", "Booking", "Dashboard"],
+    }),
+
+    /* ── Kế toán ── */
+    contracts: b.query<T.Contract[], void>({ query: () => "/v1/contracts", providesTags: ["Contract"] }),
+    saveContract: b.mutation<T.Contract, Partial<T.Contract>>({
+      query: ({ id, customerName: _a, customerTaxCode: _b, customerPhone: _c, itemName: _d, code: _e, lastBilledPeriod: _f, ...body }) => ({ url: id ? `/v1/contracts/${id}` : "/v1/contracts", method: id ? "PATCH" : "POST", body }),
+      invalidatesTags: ["Contract"],
+    }),
+    deleteContract: b.mutation<Id, string>({ query: (id) => ({ url: `/v1/contracts/${id}`, method: "DELETE" }), invalidatesTags: ["Contract", "Tax"] }),
+    billContracts: b.mutation<{ period: string; created: string[] }, { period: string }>({
+      query: (body) => ({ url: "/v1/contracts/bill", method: "POST", body }),
+      invalidatesTags: ["Contract", "Invoice", "Dashboard"],
+    }),
+    taxTasks: b.query<T.TaxTaskRow[], { from?: string; to?: string } | void>({ query: (p) => ({ url: "/v1/tax-tasks", params: p ?? undefined }), providesTags: ["Tax"] }),
+    generateTax: b.mutation<{ created: number; contracts: number }, { months: number }>({
+      query: (body) => ({ url: "/v1/tax-tasks", method: "POST", body }),
+      invalidatesTags: ["Tax"],
+    }),
+    updateTax: b.mutation<T.TaxTaskRow, Id & { status: "pending" | "done"; note?: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/tax-tasks/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["Tax"],
+    }),
   }),
 });
 
@@ -187,4 +245,9 @@ export const {
   useInvoicesQuery, useInvoiceQuery, useCreateInvoiceMutation, useAddPaymentMutation, useCancelInvoiceMutation, useEinvoiceMutation,
   useSettingsQuery, useSaveSettingsMutation, useMisaTestMutation, useDomainsQuery, useAddDomainMutation, useVerifyDomainMutation, useDeleteDomainMutation,
   useAuditQuery,
+  useCatalogQuery, useSaveCategoryMutation, useDeleteCategoryMutation, useSaveItemMutation, useDeleteItemMutation,
+  useResourcesQuery, useSaveResourceMutation, useDeleteResourceMutation, useSaveLayoutMutation,
+  useReservationsQuery, useWalkinMutation, useUpdateReservationMutation,
+  useContractsQuery, useSaveContractMutation, useDeleteContractMutation, useBillContractsMutation,
+  useTaxTasksQuery, useGenerateTaxMutation, useUpdateTaxMutation,
 } = api;

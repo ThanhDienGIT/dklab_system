@@ -59,7 +59,7 @@ function FieldShell({ id, label, required, hint, error, ok, icon, children }: { 
   );
 }
 
-function Checklist({ items }: { items: { label: string; done: boolean }[] }) {
+export function Checklist({ items }: { items: { label: string; done: boolean }[] }) {
   const done = items.filter((x) => x.done).length;
   const pct = Math.round((done / items.length) * 100);
   return (
@@ -82,7 +82,7 @@ function Checklist({ items }: { items: { label: string; done: boolean }[] }) {
   );
 }
 
-function Success({ code, total }: { code: string; total: number }) {
+export function Success({ code, total }: { code: string; total: number }) {
   return (
     <div className="pop-in rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center" role="status">
       <CheckCircle2 className="mx-auto text-emerald-600" size={48} />
@@ -98,7 +98,7 @@ function Success({ code, total }: { code: string; total: number }) {
 }
 
 /* ─────────── Hook gửi + quản lý lỗi ─────────── */
-function useContactForm(formRef: React.RefObject<HTMLFormElement | null>, initial?: Partial<Contact>) {
+export function useContactForm(formRef: React.RefObject<HTMLFormElement | null>, initial?: Partial<Contact>) {
   const [c, setC] = useState<Contact>({ fullName: "", phone: "", email: "", consent: true, ...initial });
   const [touched, setTouched] = useState<Partial<Record<keyof Contact, boolean>>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -148,7 +148,7 @@ function useContactForm(formRef: React.RefObject<HTMLFormElement | null>, initia
   return { c, set, blur, show, errors, submit, state, checklist };
 }
 
-function ContactInputs({ f, ids }: { f: ReturnType<typeof useContactForm>; ids: string }) {
+export function ContactInputs({ f, ids }: { f: ReturnType<typeof useContactForm>; ids: string }) {
   const { c, set, blur, show } = f;
   const aria = (k: string, err?: string) => ({ "aria-invalid": !!err, "aria-describedby": `${ids}-${k}-${err ? "err" : "hint"}` });
   const ePhone = show("phone");
@@ -172,7 +172,7 @@ function ContactInputs({ f, ids }: { f: ReturnType<typeof useContactForm>; ids: 
   );
 }
 
-function Consent({ f, ids, text }: { f: ReturnType<typeof useContactForm>; ids: string; text: string }) {
+export function Consent({ f, ids, text }: { f: ReturnType<typeof useContactForm>; ids: string; text: string }) {
   const err = f.show("consent");
   return (
     <div>
@@ -186,7 +186,7 @@ function Consent({ f, ids, text }: { f: ReturnType<typeof useContactForm>; ids: 
   );
 }
 
-function Submit({ loading, label, missing }: { loading: boolean; label: string; missing: string[] }) {
+export function Submit({ loading, label, missing }: { loading: boolean; label: string; missing: string[] }) {
   return (
     <div data-guide="submit">
       <button disabled={loading} className="group relative w-full overflow-hidden rounded-xl bg-orange-600 py-3.5 font-semibold text-slate-950 shadow-lg shadow-orange-600/25 transition hover:-translate-y-0.5 hover:bg-orange-500 active:translate-y-0 disabled:opacity-60">
@@ -259,7 +259,7 @@ export function BookingForm({ tour }: { tour: Tour }) {
   );
 }
 
-function Stepper({ label, value, min, onChange }: { label: string; value: number; min: number; onChange: (v: number) => void }) {
+export function Stepper({ label, value, min, onChange }: { label: string; value: number; min: number; onChange: (v: number) => void }) {
   return (
     <div>
       <span className="mb-1 block text-xs font-semibold text-slate-700">{label}</span>

@@ -17,6 +17,8 @@ export const GET = withAuth(null, async (_req, ctx) => {
     user: { id: ctx.sub, name: ctx.name, roles: ctx.roles, perms: ctx.perms },
     tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name, industry: tenant.industry, brand: tenant.settings.brand ?? {} },
     modules: mods.map((m) => m.key),
-    labels: { booking: preset.bookingLabel, resource: preset.resourceLabel },
+    industry: { key: preset.key, name: preset.name, engine: preset.engine, booking: preset.booking },
+    labels: preset.labels,
+    impersonatedBy: ctx.imp ?? null,
   });
 });

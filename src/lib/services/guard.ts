@@ -13,6 +13,9 @@ const LABEL = new Map<unknown, string>([
   [schema.tours, "Tour"],
   [schema.tourDepartures, "Lịch khởi hành"],
   [schema.bookingRequests, "Đặt chỗ"],
+  [schema.catalogCategories, "Nhóm danh mục"],
+  [schema.catalogItems, "Mục danh mục"],
+  [schema.resources, "Tài nguyên"],
 ]);
 
 /**

@@ -61,6 +61,19 @@ export function proxy(req: NextRequest) {
     return NextResponse.next({ request: { headers } });
   }
 
+  // Trang quản trị nền tảng: tách riêng, bắt buộc đăng nhập Super Admin
+  if (pathname === "/superdklab" || pathname.startsWith("/superdklab/")) {
+    if (pathname !== "/superdklab/login" && !req.cookies.get("dk_pli")) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/superdklab/login";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    const res = NextResponse.next({ request: { headers } });
+    res.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return res;
+  }
+
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     if (!req.cookies.get("dk_li")) {
       const url = req.nextUrl.clone();

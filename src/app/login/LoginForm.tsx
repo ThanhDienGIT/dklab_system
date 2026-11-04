@@ -5,8 +5,9 @@ import { useState } from "react";
 import { Button, Field } from "@/components/ui";
 
 export type DemoAccount = { email: string; role: string };
+export type DemoTenant = { slug: string; name: string; industry: string; accounts: DemoAccount[] };
 
-export function LoginForm({ demo }: { demo: DemoAccount[] | null }) {
+export function LoginForm({ demo, password: demoPw }: { demo: DemoTenant[] | null; password: string }) {
   const router = useRouter();
   const sp = useSearchParams();
   const [identifier, setIdentifier] = useState("");
@@ -53,19 +54,32 @@ export function LoginForm({ demo }: { demo: DemoAccount[] | null }) {
           Đăng nhập
         </Button>
       </form>
-      {demo && demo.length > 0 && <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white/70 p-4 text-xs text-slate-600">
-        <p className="mb-2 font-medium">Tài khoản demo (mật khẩu: Admin@123)</p>
-        <ul className="space-y-1">
-          {demo.map((d) => (
-            <li key={d.email}>
-              <button type="button" className="text-brand hover:underline" onClick={() => { setIdentifier(d.email); setPassword("Admin@123"); }}>
-                {d.email}
-              </button>{" "}
-              – {d.role}
-            </li>
-          ))}
-        </ul>
-      </div>}
+      {demo && demo.length > 0 && (() => {
+        const cur = demo.find((d) => d.slug === sp.get("tenant")) ?? demo[0];
+        return (
+          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white/70 p-4 text-xs text-slate-600">
+            <label className="mb-2 block font-medium">
+              Doanh nghiệp demo
+              <select
+                className="input mt-1"
+                value={cur.slug}
+                onChange={(e) => { window.location.href = `/login?tenant=${encodeURIComponent(e.target.value)}`; }}
+              >
+                {demo.map((d) => <option key={d.slug} value={d.slug}>{d.name} · {d.industry}</option>)}
+              </select>
+            </label>
+            <p className="mb-1 font-medium">Tài khoản (mật khẩu: {demoPw})</p>
+            <ul className="space-y-1">
+              {cur.accounts.map((d) => (
+                <li key={d.email}>
+                  <button type="button" className="text-brand hover:underline" onClick={() => { setIdentifier(d.email); setPassword(demoPw); }}>{d.email}</button> – {d.role}
+                </li>
+              ))}
+            </ul>
+            <a href={`/?tenant=${encodeURIComponent(cur.slug)}`} className="mt-2 inline-block text-sky-700 underline">Xem website {cur.name}</a>
+          </div>
+        );
+      })()}
     </div>
   );
 }

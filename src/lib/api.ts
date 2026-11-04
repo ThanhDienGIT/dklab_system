@@ -137,7 +137,7 @@ export function withAuth<P = unknown>(
 }
 
 export async function audit(
-  ctx: Pick<AuthContext, "tid" | "sub" | "ip">,
+  ctx: Pick<AuthContext, "tid" | "sub" | "ip"> & { imp?: string },
   action: string,
   entity: string,
   entityId?: string | null,
@@ -149,7 +149,8 @@ export async function audit(
     action,
     entity,
     entityId: entityId ?? null,
-    data: (data ?? null) as object,
+    // Thao tác khi Super Admin đăng nhập thay: đánh dấu rõ trong nhật ký doanh nghiệp
+    data: (ctx.imp ? { ...(typeof data === "object" && data ? data : { value: data ?? null }), impersonatedBy: ctx.imp } : (data ?? null)) as object,
     ip: ctx.ip,
   });
 }

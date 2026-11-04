@@ -12,6 +12,9 @@ import postgres from "postgres";
 import * as schema from "../src/lib/db/schema";
 import { DEFAULT_ROLES, getPreset } from "../src/modules/presets";
 import { dbEnvNames, resolveDatabaseUrl } from "../src/lib/db/url";
+import { DEMO_SEEDS } from "../src/plugins/_seeds";
+import type { DemoSeed } from "../src/plugins/types";
+import { tasksBetween } from "../src/lib/services/tax";
 
 const url = resolveDatabaseUrl();
 if (!url) {
@@ -139,11 +142,147 @@ async function seedTenant() {
   console.log(`✓ Seed xong. Đăng nhập: admin@dulichdemo.vn / ${password}`);
 }
 
+/* ═════════════ Seed doanh nghiệp demo cho từng plugin ngành (src/plugins/<key>/seed.ts) ═════════════ */
+const vn = (date: string, time: string) => new Date(`${date}T${time}:00+07:00`);
+const vnToday = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+
+async function seedIndustry(industry: string, d: DemoSeed) {
+  const [exists] = await db.select({ id: schema.tenants.id }).from(schema.tenants).where(eq(schema.tenants.slug, d.slug));
+  if (exists) {
+    console.log(`✓ "${d.slug}" đã tồn tại`);
+    return;
+  }
+  const preset = getPreset(industry);
+  const password = process.env.SEED_ADMIN_PASSWORD || "Admin@123";
+  const pw = await hash(password, { memoryCost: 19456, timeCost: 2, parallelism: 1 });
+  await db.transaction(async (tx) => {
+    const [t] = await tx
+      .insert(schema.tenants)
+      .values({
+        slug: d.slug,
+        name: d.name,
+        industry,
+        settings: {
+          brand: { primaryColor: preset.color, tagline: preset.tagline },
+          contact: d.contact,
+          company: { ...d.company, address: d.contact.address },
+          invoice: { prefix: d.slug.slice(0, 2).toUpperCase(), defaultVatRate: industry === "accounting" ? 10 : 8 },
+          bankAccounts: [{ id: "vcb-main", bankBin: "970436", bankName: "Vietcombank", accountNumber: "0123456789", accountName: d.company.legalName.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/Đ/g, "D"), isDefault: true }],
+          misa: { enabled: true, env: "mock", invSeries: "1C26TDV", withCode: true },
+        },
+      })
+      .returning();
+    await tx.insert(schema.tenantModules).values(preset.modules.map((m) => ({ tenantId: t.id, moduleKey: m })));
+    const [branch] = await tx.insert(schema.branches).values({ tenantId: t.id, name: "Cơ sở chính", address: d.contact.address, phone: d.contact.phone }).returning();
+    const roles = await tx
+      .insert(schema.roles)
+      .values(DEFAULT_ROLES.map((r) => ({ tenantId: t.id, key: r.key, name: r.name, description: r.description, permissions: r.permissions, isSystem: true })))
+      .returning();
+    const roleId = (k: string) => roles.find((r) => r.key === k)!.id;
+    const people = [
+      { local: "admin", fullName: "Chủ doanh nghiệp", role: "owner", position: "Giám đốc" },
+      { local: "letan", fullName: "Lễ tân", role: "receptionist", position: "Lễ tân" },
+      { local: "ketoan", fullName: "Kế toán", role: "accountant", position: "Kế toán" },
+    ];
+    for (const [i, a] of people.entries()) {
+      const [u] = await tx.insert(schema.users).values({ tenantId: t.id, fullName: a.fullName, email: `${a.local}@${d.domainEmail}`, passwordHash: pw }).returning();
+      await tx.insert(schema.userRoles).values({ userId: u.id, roleId: roleId(a.role) });
+      await tx.insert(schema.employees).values({ tenantId: t.id, branchId: branch.id, userId: u.id, code: `NV00${i + 1}`, fullName: a.fullName, email: `${a.local}@${d.domainEmail}`, position: a.position });
+    }
+    const itemIds = new Map<string, string>();
+    let order = 0;
+    for (const cat of d.categories) {
+      const [c] = await tx.insert(schema.catalogCategories).values({ tenantId: t.id, name: cat.name, sortOrder: order++ }).returning();
+      for (const [k, it] of cat.items.entries()) {
+        const [row] = await tx.insert(schema.catalogItems).values({ tenantId: t.id, categoryId: c.id, sortOrder: k, ...it, tags: it.tags ?? [] }).returning();
+        itemIds.set(it.name, row.id);
+      }
+    }
+    const res = [];
+    for (const [k, r] of d.resources.entries()) {
+      const [row] = await tx
+        .insert(schema.resources)
+        .values({ tenantId: t.id, kind: r.kind, name: r.name, area: r.area ?? null, capacity: r.capacity ?? (r.kind === "room" ? 2 : 1), x: r.x ?? 0, y: r.y ?? 0, shape: r.shape ?? "square", itemId: r.itemName ? itemIds.get(r.itemName) ?? null : null, sortOrder: k })
+        .returning();
+      res.push(row);
+    }
+    // 2 đặt chỗ mẫu ngày mai để màn hình lễ tân / lịch có dữ liệu
+    const tomorrow = new Date(Date.now() + 31 * 3600_000).toISOString().slice(0, 10);
+    const samples = [
+      { fullName: "Nguyễn Thu Hà", phone: "0912000101", time: preset.engine === "rooms" ? "14:00" : "10:00" },
+      { fullName: "Trần Quốc Việt", phone: "0912000102", time: preset.engine === "rooms" ? "14:00" : "18:00" },
+    ];
+    for (const [k, sm] of samples.entries()) {
+      const [cust] = await tx.insert(schema.customers).values({ tenantId: t.id, fullName: sm.fullName, phone: sm.phone, source: "website", bookingCount: 1, consentAt: new Date() }).returning();
+      let resource = res.find((r) => r.kind === (preset.engine === "tables" ? "table" : preset.engine === "rooms" ? "room" : "staff"));
+      if (preset.engine === "tables") resource = res.filter((r) => r.kind === "table")[k] ?? resource;
+      if (preset.engine === "rooms") resource = res.filter((r) => r.kind === "room")[k * 3] ?? resource;
+      if (preset.engine === "slots") resource = res.filter((r) => r.kind === "staff")[k] ?? resource;
+      if (!resource) continue;
+      const firstItem = d.categories[0]?.items[0];
+      const startAt = vn(tomorrow, sm.time);
+      const minutes = preset.engine === "rooms" ? 22 * 60 : preset.engine === "tables" ? preset.booking.durationMin : firstItem?.durationMin ?? 60;
+      const endAt = new Date(startAt.getTime() + minutes * 60_000);
+      const [bk] = await tx
+        .insert(schema.bookingRequests)
+        .values({
+          tenantId: t.id, code: `DC${tomorrow.replace(/-/g, "").slice(2)}-${d.slug.slice(0, 2).toUpperCase()}${k + 1}`,
+          resourceType: preset.engine === "tables" ? "table" : preset.engine === "rooms" ? "room" : "service",
+          resourceId: preset.engine === "tables" ? resource.id : null, itemId: preset.engine === "tables" ? null : firstItem ? itemIds.get(firstItem.name) ?? null : null,
+          resourceLabel: preset.engine === "tables" ? `Bàn ${resource.name}` : `${firstItem?.name ?? ""} · ${resource.name}`,
+          bookingDate: tomorrow, bookingTime: sm.time, startAt, endAt, adults: 2, fullName: sm.fullName, phone: sm.phone,
+          status: k === 0 ? "new" : "confirmed", estimatedTotal: firstItem?.price ?? 0, customerId: cust.id, source: "website",
+        })
+        .returning();
+      await tx.insert(schema.reservations).values({ tenantId: t.id, resourceId: resource.id, bookingId: bk.id, startAt, endAt, partySize: 2, status: k === 0 ? "pending" : "confirmed" });
+      if (preset.engine === "slots" && getPreset(industry).booking.needsBed) {
+        const bed = res.filter((r) => r.kind === "bed")[k];
+        if (bed) await tx.insert(schema.reservations).values({ tenantId: t.id, resourceId: bed.id, bookingId: bk.id, startAt, endAt, partySize: 1, status: k === 0 ? "pending" : "confirmed" });
+      }
+    }
+    // Kế toán: khách doanh nghiệp + hợp đồng + lịch thuế 3 tháng tới
+    if (d.extra === "accounting") {
+      const pkg = itemIds.get(d.categories[0].items[0].name) ?? null;
+      const companies = [
+        { fullName: "Công ty TNHH Thương mại Hải Đăng", taxCode: "0316789012", phone: "0283800111", period: "quarterly", fee: 1_000_000 },
+        { fullName: "Công ty CP Công nghệ Sao Mai", taxCode: "0317890123", phone: "0283800222", period: "monthly", fee: 2_500_000 },
+        { fullName: "Hộ kinh doanh Cà phê Gió", taxCode: "8023456789", phone: "0909111222", period: "quarterly", fee: 600_000 },
+      ];
+      const today = vnToday();
+      const until = new Date(Date.now() + 100 * 86400_000).toISOString().slice(0, 10);
+      for (const [k, co] of companies.entries()) {
+        const [cust] = await tx.insert(schema.customers).values({ tenantId: t.id, fullName: co.fullName, taxCode: co.taxCode, phone: co.phone, tags: ["Doanh nghiệp"], source: "referral" }).returning();
+        const [c] = await tx
+          .insert(schema.contracts)
+          .values({ tenantId: t.id, customerId: cust.id, itemId: pkg, code: `HD-KT00${k + 1}`, title: "Dịch vụ kê khai thuế trọn gói", monthlyFee: co.fee, taxPeriod: co.period, startDate: "2026-01-01" })
+          .returning();
+        const tasks = tasksBetween(co.period as "monthly" | "quarterly", new Date(Date.now() - 40 * 86400_000).toISOString().slice(0, 10), until);
+        if (tasks.length) await tx.insert(schema.taxTasks).values(tasks.map((x) => ({ ...x, tenantId: t.id, contractId: c.id, customerId: cust.id, status: x.dueDate < today ? "done" : "pending" })));
+      }
+    }
+  });
+  console.log(`✓ Seed "${d.slug}" (${industry}). Đăng nhập: admin@${d.domainEmail} / ${password}`);
+}
+
+/* ═════════════ Super Admin nền tảng ═════════════ */
+async function seedPlatformAdmin() {
+  const [any] = await db.select({ id: schema.platformAdmins.id }).from(schema.platformAdmins).limit(1);
+  if (any) return;
+  const username = (process.env.PLATFORM_ADMIN_USER || "dklab").toLowerCase();
+  const password = process.env.PLATFORM_ADMIN_PASSWORD || "Dklab@123";
+  await db.insert(schema.platformAdmins).values({ username, fullName: "Quản trị nền tảng", passwordHash: await hash(password, { memoryCost: 19456, timeCost: 2, parallelism: 1 }) });
+  console.log(`✓ Tạo Super Admin: ${username} (đăng nhập tại /superdklab)`);
+}
+
 (async () => {
   console.log("→ Chạy migration…");
   await migrate(db, { migrationsFolder: "./drizzle" });
   console.log("✓ Migration xong");
-  if (process.env.SEED !== "0") await seedTenant();
+  await seedPlatformAdmin();
+  if (process.env.SEED !== "0") {
+    await seedTenant();
+    for (const x of DEMO_SEEDS) await seedIndustry(x.industry, x.demo);
+  }
   await client.end();
 })().catch(async (e) => {
   console.error(e);

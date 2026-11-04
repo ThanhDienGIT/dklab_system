@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getTenantCached } from "@/lib/tenant";
+import { getPreset } from "@/modules/presets";
 
 export default function SiteLayout({ children, params }: LayoutProps<"/s/[tenant]">) {
   return (
@@ -17,7 +18,11 @@ async function Chrome({ params, children }: { params: Promise<{ tenant: string }
   const t = await getTenantCached(key);
   if (!t || t.status !== "active") notFound();
   const c = t.settings.contact ?? {};
-  const brand = t.settings.brand?.primaryColor ?? "#0369a1";
+  const preset = getPreset(t.industry);
+  const brand = t.settings.brand?.primaryColor ?? preset.color;
+  const nav = preset.engine === "tours"
+    ? [{ href: "/#tours", label: "Tour" }, { href: "/#tu-van", label: "Tư vấn" }]
+    : [{ href: "/#danh-muc", label: preset.labels.catalogNav }, { href: "/#dat-cho", label: preset.labels.booking }];
   return (
     <div style={{ "--brand": brand } as React.CSSProperties} className="flex min-h-dvh flex-col bg-white">
       <div className="scroll-progress fixed inset-x-0 top-0 z-50 h-0.5 bg-gradient-to-r from-sky-500 via-orange-500 to-emerald-500" aria-hidden />
@@ -28,8 +33,7 @@ async function Chrome({ params, children }: { params: Promise<{ tenant: string }
             <span className="text-lg">{t.name}</span>
           </Link>
           <nav className="ml-auto hidden items-center gap-6 text-sm font-medium text-slate-600 sm:flex">
-            <Link href="/#tours" className="transition hover:text-brand">Tour</Link>
-            <Link href="/#tu-van" className="transition hover:text-brand">Tư vấn</Link>
+            {nav.map((n) => <Link key={n.href} href={n.href} className="transition hover:text-brand">{n.label}</Link>)}
             <Link href="/#lien-he" className="transition hover:text-brand">Liên hệ</Link>
           </nav>
           {(c.hotline || c.phone) && (
@@ -53,7 +57,7 @@ async function Chrome({ params, children }: { params: Promise<{ tenant: string }
             {c.email && <li className="flex gap-2"><Mail size={16} /> <a href={`mailto:${c.email}`}>{c.email}</a></li>}
           </ul>
           <div className="text-sm text-slate-400">
-            Đặt tour online: để lại số điện thoại, nhân viên sẽ gọi xác nhận trong giờ làm việc.
+            {preset.labels.booking} online: để lại số điện thoại, nhân viên sẽ gọi xác nhận trong giờ làm việc.
             <div className="mt-3"><Link href="/admin" className="text-slate-500 hover:text-white">Đăng nhập nhân viên</Link></div>
           </div>
         </div>

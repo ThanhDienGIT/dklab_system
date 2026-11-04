@@ -89,3 +89,64 @@ export const InvoiceBody = z.object({
     )
     .min(1, "Hóa đơn cần ít nhất 1 dòng"),
 });
+
+export const CategoryBody = z.object({
+  name: z.string().trim().min(1, "Nhập tên nhóm").max(80),
+  sortOrder: z.coerce.number().int().default(0),
+  isActive: z.boolean().default(true),
+});
+
+export const CatalogItemBody = z.object({
+  categoryId: z.uuid().nullable().optional(),
+  name: z.string().trim().min(1, "Nhập tên").max(150),
+  description: optionalText(2000),
+  price: money.default(0),
+  durationMin: z.coerce.number().int().min(5).max(24 * 60).nullable().optional(),
+  capacity: z.coerce.number().int().min(1).max(100).nullable().optional(),
+  imageUrl: httpsUrl.optional().nullable(),
+  tags: z.array(z.string().trim().max(30)).max(10).default([]),
+  isActive: z.boolean().default(true),
+  sortOrder: z.coerce.number().int().default(0),
+});
+
+export const ResourceBody = z.object({
+  kind: z.enum(["table", "room", "bed", "staff"]),
+  name: z.string().trim().min(1, "Nhập tên").max(60),
+  area: optionalText(60),
+  capacity: z.coerce.number().int().min(1).max(200).default(1),
+  itemId: z.uuid().nullable().optional(),
+  x: z.coerce.number().int().min(0).max(40).default(0),
+  y: z.coerce.number().int().min(0).max(40).default(0),
+  shape: z.enum(["round", "square", "rect"]).default("square"),
+  housekeeping: z.enum(["clean", "dirty", "maintenance"]).default("clean"),
+  isActive: z.boolean().default(true),
+  sortOrder: z.coerce.number().int().default(0),
+});
+
+export const ContractBody = z.object({
+  customerId: z.uuid({ error: "Chọn khách hàng" }),
+  itemId: z.uuid().nullable().optional(),
+  title: z.string().trim().min(3, "Nhập tên hợp đồng").max(200),
+  monthlyFee: money.default(0),
+  taxPeriod: z.enum(["monthly", "quarterly"]).default("quarterly"),
+  startDate: z.iso.date(),
+  endDate: z.iso.date().nullable().optional(),
+  status: z.enum(["active", "paused", "ended"]).default("active"),
+  note: optionalText(2000),
+});
+
+
+/** PATCH tài nguyên: chỉ cập nhật trường được gửi (KHÔNG có default — tránh vô tình reset sức chứa / vị trí) */
+export const ResourcePatchBody = z.object({
+  kind: z.enum(["table", "room", "bed", "staff"]).optional(),
+  name: z.string().trim().min(1, "Nhập tên").max(60).optional(),
+  area: optionalText(60),
+  capacity: z.coerce.number().int().min(1).max(200).optional(),
+  itemId: z.uuid().nullable().optional(),
+  x: z.coerce.number().int().min(0).max(40).optional(),
+  y: z.coerce.number().int().min(0).max(40).optional(),
+  shape: z.enum(["round", "square", "rect"]).optional(),
+  housekeeping: z.enum(["clean", "dirty", "maintenance"]).optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.coerce.number().int().optional(),
+});

@@ -41,6 +41,7 @@ async function issue(
   tenant: { id: string; slug: string },
   sessionId: string,
   refreshToken: string,
+  imp?: string | null,
 ): Promise<TokenPair> {
   const access = await loadAccess(user.id);
   const claims: AccessClaims = {
@@ -51,6 +52,7 @@ async function issue(
     tv: user.tokenVersion,
     name: user.fullName,
     ...access,
+    ...(imp ? { imp } : {}),
   };
   return { accessToken: await signAccessToken(claims), refreshToken, claims };
 }
@@ -158,7 +160,22 @@ export async function refresh(refreshToken: string): Promise<RefreshResult> {
     .returning({ id: schema.sessions.id });
   if (updated.length === 0) return { kind: "stale" }; // request song song đã xoay trước
 
-  return { kind: "ok", tokens: await issue(row.user, row.tenant, s.id, next) };
+  return { kind: "ok", tokens: await issue(row.user, row.tenant, s.id, next, s.impersonatedBy) };
+}
+
+/**
+ * Super Admin đăng nhập thay một tài khoản doanh nghiệp (hỗ trợ khách).
+ * Phiên riêng, hết hạn sau 1 giờ, token mang cờ imp => admin hiển thị banner cảnh báo; mọi thao tác vẫn ghi audit.
+ */
+export async function impersonate(tenant: { id: string; slug: string }, userId: string, adminId: string): Promise<TokenPair> {
+  const [user] = await db.select().from(schema.users).where(and(eq(schema.users.id, userId), eq(schema.users.tenantId, tenant.id)));
+  if (!user) throw new ApiError(404, "Không tìm thấy tài khoản");
+  const refreshToken = randomToken();
+  const [session] = await db
+    .insert(schema.sessions)
+    .values({ tenantId: tenant.id, userId, refreshHash: sha256(refreshToken), userAgent: "super-admin-impersonation", impersonatedBy: adminId, expiresAt: new Date(Date.now() + 3600_000) })
+    .returning({ id: schema.sessions.id });
+  return issue(user, tenant, session.id, refreshToken, adminId);
 }
 
 export async function revokeByRefresh(refreshToken: string) {

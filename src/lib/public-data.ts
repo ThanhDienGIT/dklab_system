@@ -40,3 +40,22 @@ export async function getPublicTour(tenantId: string, slug: string) {
   return { ...rest, departures };
 }
 export type PublicTour = NonNullable<Awaited<ReturnType<typeof getPublicTour>>>;
+
+/** Danh mục công khai (menu / dịch vụ / loại phòng) — cache theo tag catalog:<tenantId> */
+export async function getPublicCatalog(tenantId: string) {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(`catalog:${tenantId}`);
+  const C = schema.catalogCategories;
+  const I = schema.catalogItems;
+  const [categories, items] = await Promise.all([
+    db.select({ id: C.id, name: C.name }).from(C).where(and(eq(C.tenantId, tenantId), eq(C.isActive, true))).orderBy(asc(C.sortOrder), asc(C.name)),
+    db
+      .select({ id: I.id, categoryId: I.categoryId, name: I.name, description: I.description, price: I.price, durationMin: I.durationMin, capacity: I.capacity, imageUrl: I.imageUrl, tags: I.tags })
+      .from(I)
+      .where(and(eq(I.tenantId, tenantId), eq(I.isActive, true)))
+      .orderBy(asc(I.sortOrder), asc(I.name)),
+  ]);
+  return { categories, items };
+}
+export type PublicCatalog = Awaited<ReturnType<typeof getPublicCatalog>>;

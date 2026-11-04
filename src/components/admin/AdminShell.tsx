@@ -1,6 +1,6 @@
 "use client";
 import {
-  ExternalLink, FileText, History, Home, IdCard, Inbox, LogOut, Map, Menu, Receipt, Settings, Shield, Users, type LucideIcon,
+  CalendarClock, CalendarDays, ExternalLink, FileText, History, Home, IdCard, Inbox, LayoutGrid, List, LogOut, Map, Menu, Receipt, Settings, Shield, ShieldAlert, Users, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,7 +13,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { StoreProvider } from "@/store/Provider";
 import { closeSidebar, setSession, toggleSidebar } from "@/store/store";
 
-const ICONS: Record<string, LucideIcon> = { home: Home, shield: Shield, settings: Settings, history: History, inbox: Inbox, users: Users, id: IdCard, receipt: Receipt, map: Map, file: FileText };
+const ICONS: Record<string, LucideIcon> = { home: Home, shield: Shield, settings: Settings, history: History, inbox: Inbox, users: Users, id: IdCard, receipt: Receipt, map: Map, file: FileText, list: List, grid: LayoutGrid, calendar: CalendarDays, tax: CalendarClock };
 
 export function usePerm() {
   const { data } = useMeQuery();
@@ -49,7 +49,7 @@ function Shell({ children }: { children: ReactNode }) {
     .flatMap((m) => m.nav)
     .filter((n) => hasPermission(me?.user.perms, n.permission) || hasPermission(me?.user.perms, n.permission.replace(/\.view$/, ".view:own")));
   // Sắp xếp: Tổng quan, Đặt chỗ, nghiệp vụ, rồi hệ thống
-  const order = ["/admin", "/admin/bookings", "/admin/tours", "/admin/invoices", "/admin/customers", "/admin/employees", "/admin/users", "/admin/settings", "/admin/audit"];
+  const order = ["/admin", "/admin/bookings", "/admin/resources", "/admin/schedule", "/admin/catalog", "/admin/tours", "/admin/contracts", "/admin/tax", "/admin/invoices", "/admin/customers", "/admin/employees", "/admin/users", "/admin/settings", "/admin/audit"];
   nav.sort((a, b) => order.indexOf(a.href) - order.indexOf(b.href));
 
   async function logout() {
@@ -88,7 +88,7 @@ function Shell({ children }: { children: ReactNode }) {
                 )}
               >
                 <Icon size={17} />
-                <span className="flex-1">{n.href === "/admin/bookings" && me ? me.labels.booking : n.label}</span>
+                <span className="flex-1">{n.href === "/admin/bookings" && me ? me.labels.booking : n.labelKey && me ? me.labels[n.labelKey] : n.label}</span>
                 {n.href === "/admin/bookings" && !!newCount && <span className="rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white">{newCount}</span>}
               </Link>
             );
@@ -118,6 +118,12 @@ function Shell({ children }: { children: ReactNode }) {
         <span className="font-semibold">{me?.tenant.name}</span>
       </header>
 
+      {me?.impersonatedBy && (
+        <div className="no-print sticky top-0 z-30 flex items-center justify-center gap-2 bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950">
+          <ShieldAlert size={16} /> Super Admin đang đăng nhập thay chủ doanh nghiệp này. Mọi thao tác đều được ghi nhật ký.
+          <button onClick={logout} className="ml-2 rounded bg-slate-950 px-2 py-0.5 text-xs text-white">Thoát</button>
+        </div>
+      )}
       <main className="mx-auto max-w-6xl p-4 sm:p-6">{isLoading && !me ? <div className="h-40 animate-pulse rounded-xl bg-slate-200/60" /> : children}</main>
     </div>
   );

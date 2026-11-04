@@ -5,26 +5,18 @@
 
 export type RolePreset = { key: string; name: string; description: string; permissions: string[] };
 
-export type IndustryPreset = {
-  key: string;
-  name: string;
-  modules: string[];
-  /** Nhãn dùng chung cho màn hình đặt chỗ */
-  bookingLabel: string;
-  resourceLabel: string;
-  status: "ready" | "planned";
-};
+import { PLUGINS } from "@/plugins/_registry";
+import type { IndustryConfig } from "@/plugins/types";
 
-const COMMON_MODULES = ["core", "booking", "crm", "hr", "invoice"];
+export type IndustryPreset = IndustryConfig & { key: string; name: string; description: string };
 
-export const INDUSTRY_PRESETS: IndustryPreset[] = [
-  { key: "travel", name: "Du lịch – Lữ hành", modules: [...COMMON_MODULES, "tour"], bookingLabel: "Đặt tour", resourceLabel: "Tour", status: "ready" },
-  { key: "cafe", name: "Quán cà phê", modules: [...COMMON_MODULES, "table", "menu"], bookingLabel: "Đặt bàn", resourceLabel: "Bàn", status: "planned" },
-  { key: "restaurant", name: "Nhà hàng", modules: [...COMMON_MODULES, "table", "menu"], bookingLabel: "Đặt bàn", resourceLabel: "Bàn", status: "planned" },
-  { key: "hotel", name: "Khách sạn", modules: [...COMMON_MODULES, "room"], bookingLabel: "Đặt phòng", resourceLabel: "Phòng", status: "planned" },
-  { key: "spa", name: "Spa – Làm đẹp", modules: [...COMMON_MODULES, "spa-service"], bookingLabel: "Đặt lịch", resourceLabel: "Dịch vụ", status: "planned" },
-  { key: "accounting", name: "Dịch vụ kế toán", modules: [...COMMON_MODULES], bookingLabel: "Đặt lịch tư vấn", resourceLabel: "Dịch vụ", status: "planned" },
-];
+/** Danh sách ngành = các plugin có khai báo `industry` (src/plugins/<key>/manifest.ts) */
+export const INDUSTRY_PRESETS: IndustryPreset[] = PLUGINS.filter((p) => p.industry).map((p) => ({
+  key: p.key,
+  name: p.name,
+  description: p.description,
+  ...p.industry!,
+}));
 
 /** Vai trò mặc định (dùng chung mọi ngành, chủ doanh nghiệp có thể sửa / tạo thêm). */
 export const DEFAULT_ROLES: RolePreset[] = [
@@ -43,6 +35,8 @@ export const DEFAULT_ROLES: RolePreset[] = [
       "customer.view", "customer.manage", "employee.view", "employee.manage",
       "invoice.view", "invoice.create", "invoice.payment", "invoice.cancel", "einvoice.publish",
       "tour.view", "tour.manage", "audit.view",
+      "catalog.view", "catalog.manage", "resource.view", "resource.manage", "schedule.view",
+      "contract.view", "contract.manage", "tax.manage",
     ],
   },
   {
@@ -52,22 +46,23 @@ export const DEFAULT_ROLES: RolePreset[] = [
     permissions: [
       "dashboard.view", "booking.view", "booking.handle", "customer.view", "customer.manage",
       "invoice.view", "invoice.create", "invoice.payment", "tour.view",
+      "catalog.view", "resource.view", "schedule.view", "contract.view",
     ],
   },
   {
     key: "accountant",
     name: "Kế toán",
     description: "Hóa đơn, thanh toán, hóa đơn điện tử",
-    permissions: ["dashboard.view", "invoice.view", "invoice.create", "invoice.payment", "invoice.cancel", "einvoice.publish", "customer.view"],
+    permissions: ["dashboard.view", "invoice.view", "invoice.create", "invoice.payment", "invoice.cancel", "einvoice.publish", "customer.view", "contract.view", "contract.manage", "tax.manage"],
   },
   {
     key: "staff",
     name: "Nhân viên",
     description: "Chỉ xem các đặt chỗ được giao cho mình",
-    permissions: ["booking.view:own", "booking.handle:own", "tour.view"],
+    permissions: ["booking.view:own", "booking.handle:own", "tour.view", "schedule.view", "resource.view"],
   },
 ];
 
-export function getPreset(key: string) {
-  return INDUSTRY_PRESETS.find((p) => p.key === key) ?? INDUSTRY_PRESETS[0];
+export function getPreset(key: string): IndustryPreset {
+  return INDUSTRY_PRESETS.find((p) => p.key === key) ?? INDUSTRY_PRESETS.find((p) => p.key === "travel")!;
 }

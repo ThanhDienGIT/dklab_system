@@ -34,6 +34,7 @@ function InvoiceForm({ booking, settings }: { booking: BookingWithPrice | null; 
   }));
   const [lines, setLines] = useState<Line[]>(() => {
     if (!booking) return [{ itemName: "", unit: "Khách", quantity: 1, unitPrice: 0, vatRate: defaultVat }];
+    if (booking.lines?.length) return booking.lines.map((l: Omit<Line, "vatRate">) => ({ ...l, vatRate: defaultVat }));
     const p = booking.unitPrice;
     const label = `${booking.resourceLabel ?? "Dịch vụ"}${booking.bookingDate ? ` – KH ${booking.bookingDate.split("-").reverse().join("/")}` : ""}`;
     const ls: Line[] = [{ itemName: `${label} (người lớn)`, unit: "Khách", quantity: booking.adults, unitPrice: p?.adult ?? 0, vatRate: defaultVat }];

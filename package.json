@@ -3,15 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "tsx scripts/migrate.ts && next build",
+    "dev": "tsx scripts/gen-plugins.ts && next dev",
+    "build": "tsx scripts/gen-plugins.ts && tsx scripts/migrate.ts && next build",
     "start": "next start",
     "lint": "eslint",
     "build:app": "next build",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "typecheck": "tsc --noEmit",
-    "test:security": "tsx scripts/security-test.ts"
+    "test:security": "tsx scripts/security-test.ts",
+    "plugins": "tsx scripts/gen-plugins.ts",
+    "plugin:new": "tsx scripts/new-plugin.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",

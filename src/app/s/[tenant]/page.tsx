@@ -7,7 +7,9 @@ import { CountUp, Hero3D, Reveal } from "@/components/motion";
 import { ContactForm } from "@/components/site/BookingForm";
 import { gradientFor } from "@/components/site/TourCover";
 import { ToursExplorer } from "@/components/site/ToursExplorer";
-import { getPublicTours } from "@/lib/public-data";
+import { getPublicCatalog, getPublicTours } from "@/lib/public-data";
+import { EngineHome } from "@/components/site/engines/EngineHome";
+import { getPreset } from "@/modules/presets";
 import { getTenantCached } from "@/lib/tenant";
 
 export async function generateMetadata({ params }: PageProps<"/s/[tenant]">): Promise<Metadata> {
@@ -28,6 +30,9 @@ const GUIDE: GuideStep[] = [
 export default async function Home({ params }: PageProps<"/s/[tenant]">) {
   const t = await getTenantCached((await params).tenant);
   if (!t) notFound();
+  // Ngành khác du lịch: trang chủ theo động cơ của plugin (slots / tables / rooms)
+  const preset = getPreset(t.industry);
+  if (preset.engine !== "tours") return <EngineHome t={t} preset={preset} catalog={await getPublicCatalog(t.id)} />;
   const tours = await getPublicTours(t.id);
   const heroCards = tours.slice(0, 3).map((x) => ({ title: x.title, location: x.location, price: short(x.basePrice), href: `/tours/${x.slug}`, gradient: gradientFor(x.location ?? x.title) }));
   const minPrice = tours.length ? Math.min(...tours.map((x) => x.basePrice)) : 0;

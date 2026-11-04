@@ -55,7 +55,9 @@ async function setupTenantB() {
   const [tour] = await sql`insert into tours (tenant_id, slug, title, base_price) values (${t.id}, 'tour-b', 'Tour B', 1000000) returning id`;
   const [dep] = await sql`insert into tour_departures (tenant_id, tour_id, depart_date, seats_total) values (${t.id}, ${tour.id}, current_date + 10, 10) returning id`;
   const [cust] = await sql`insert into customers (tenant_id, full_name, phone) values (${t.id}, 'Khách B', '0999999999') returning id`;
-  return { tid: t.id as string, ownerId: u.id as string, tourId: tour.id as string, depId: dep.id as string, custId: cust.id as string };
+  const [res] = await sql`insert into resources (tenant_id, kind, name, capacity) values (${t.id}, 'table', 'B-T1', 4) returning id`;
+  const [rv] = await sql`insert into reservations (tenant_id, resource_id, start_at, end_at, status) values (${t.id}, ${res.id}, now() + interval '1 day', now() + interval '1 day 2 hours', 'confirmed') returning id`;
+  return { tid: t.id as string, ownerId: u.id as string, tourId: tour.id as string, depId: dep.id as string, custId: cust.id as string, resId: res.id as string, rvId: rv.id as string };
 }
 
 async function main() {
@@ -184,6 +186,49 @@ async function main() {
   check("Header chống clickjacking", (lg.headers.get("x-frame-options") ?? "").toUpperCase() === "DENY");
   check("Có Content-Security-Policy", !!lg.headers.get("content-security-policy"));
   check("Có X-Content-Type-Options", lg.headers.get("x-content-type-options") === "nosniff");
+
+  console.log("\n— 11. Lịch giữ chỗ / tài nguyên chéo tenant");
+  r = await rec.req("PATCH", `/api/v1/reservations/${B.rvId}`, { status: "cancelled" });
+  check("Không sửa được lượt giữ chỗ của tenant khác", r.status === 404, `${r.status}`);
+  r = await owner.req("POST", "/api/v1/reservations", { resourceId: B.resId, durationMin: 60 });
+  check("Không xếp khách vào bàn của tenant khác", blocked(r), `${r.status}`);
+  r = await owner.req("PATCH", `/api/v1/resources/${B.resId}`, { name: "hacked" });
+  check("Không sửa được bàn của tenant khác", r.status === 404, `${r.status}`);
+  r = await owner.req("PUT", "/api/v1/resources/layout", { items: [{ id: B.resId, x: 9, y: 9 }] });
+  const [bres] = await sql`select x from resources where id = ${B.resId}`;
+  check("Lưu sơ đồ không đụng được bàn tenant khác", bres.x === 0, `x=${bres.x}`);
+
+  console.log("\n— 12. Super Admin nền tảng");
+  r = await owner.req("GET", "/api/platform/tenants");
+  check("Token chủ doanh nghiệp KHÔNG vào được API nền tảng", r.status === 401, `${r.status}`);
+  const pa = new Client();
+  r = await pa.req("POST", "/api/platform/auth/login", { username: "dklab", password: "sai-mat-khau" });
+  check("Super Admin sai mật khẩu bị từ chối", r.status === 401, `${r.status}`);
+  r = await pa.req("POST", "/api/platform/auth/login", { username: "dklab", password: process.env.PLATFORM_ADMIN_PASSWORD || "Dklab@123" });
+  check("setup: Super Admin đăng nhập", r.status === 200, `${r.status} ${r.json?.error ?? ""}`);
+  r = await new Client().req("GET", "/api/v1/bookings", undefined, { cookie: `dk_at=${pa.cookies.get("dk_pt")}` });
+  check("Token Super Admin KHÔNG dùng làm token doanh nghiệp được", r.status === 401, `${r.status}`);
+  const page = await fetch(BASE + "/superdklab", { redirect: "manual" });
+  check("/superdklab chưa đăng nhập => chuyển tới trang login", page.status === 307 && (page.headers.get("location") ?? "").includes("/superdklab/login"), `${page.status}`);
+  r = await pa.req("POST", `/api/platform/tenants/${B.tid}/impersonate`, { reason: "" });
+  check("Đăng nhập thay bắt buộc nhập lý do", r.status === 422, `${r.status}`);
+  const imp = new Client();
+  imp.cookies.set("dk_pt", pa.cookies.get("dk_pt")!);
+  r = await imp.req("POST", `/api/platform/tenants/${B.tid}/impersonate`, { reason: "Kiểm thử bảo mật" });
+  const me = await imp.req("GET", "/api/auth/me");
+  check("Đăng nhập thay có cờ cảnh báo + đúng tenant", r.status === 200 && me.json?.data?.impersonatedBy !== null && (me.json?.data?.tenant as { slug?: string })?.slug === "secb_test", `${r.status}/${me.status}`);
+  const [logged] = await sql`select count(*)::int as n from audit_logs where tenant_id = ${B.tid} and action = 'auth.impersonated'`;
+  check("Nhật ký doanh nghiệp ghi nhận việc đăng nhập thay", logged.n === 1, `n=${logged.n}`);
+  const bOwner = new Client();
+  await bOwner.req("POST", "/api/auth/login", { identifier: "owner@b.test", password: PW }, { cookie: "dk_tenant=secb_test" });
+  r = await pa.req("PATCH", `/api/platform/tenants/${B.tid}`, { status: "suspended" });
+  const afterSuspend = await bOwner.req("GET", "/api/v1/customers");
+  check("Khóa doanh nghiệp => phiên đang mở bị từ chối ngay", r.status === 200 && afterSuspend.status === 401, `${r.status}/${afterSuspend.status}`);
+  r = await pa.req("PUT", `/api/platform/tenants/${B.tid}/modules`, { modules: ["khong_ton_tai"] });
+  check("Không bật được module không tồn tại", r.status === 422, `${r.status}`);
+  await pa.req("POST", "/api/platform/auth/logout");
+  r = await pa.req("GET", "/api/platform/tenants");
+  check("Đăng xuất Super Admin => hết quyền", r.status === 401, `${r.status}`);
 
   // dọn dẹp
   await sql`delete from tenants where slug = 'secb_test'`;

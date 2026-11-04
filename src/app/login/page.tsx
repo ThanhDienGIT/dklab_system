@@ -1,15 +1,27 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { LoginForm, type DemoAccount } from "./LoginForm";
+import { DEMO_SEEDS } from "@/plugins/_seeds";
+import { getPreset } from "@/modules/presets";
+import { LoginForm, type DemoTenant } from "./LoginForm";
 
-// Tài khoản demo chỉ hiện khi DEMO_MODE=1 (không bao giờ hiện cho khách thật)
-const demo =
+// Danh sách doanh nghiệp + tài khoản demo chỉ có khi DEMO_MODE=1 (không bao giờ hiện cho khách thật)
+const demo: DemoTenant[] | null =
   process.env.DEMO_MODE === "1"
     ? [
-        { email: "admin@dulichdemo.vn", role: "Chủ doanh nghiệp (toàn quyền)" },
-        { email: "letan@dulichdemo.vn", role: "Lễ tân – tiếp nhận đặt chỗ" },
-        { email: "ketoan@dulichdemo.vn", role: "Kế toán – hóa đơn, MISA" },
-        { email: "hdv@dulichdemo.vn", role: "Nhân viên – chỉ việc được giao" },
+        { slug: process.env.DEFAULT_TENANT || "dulich_demo", name: "Du Lịch Demo", industry: "Du lịch", accounts: [
+          { email: "admin@dulichdemo.vn", role: "Chủ doanh nghiệp" }, { email: "letan@dulichdemo.vn", role: "Lễ tân" },
+          { email: "ketoan@dulichdemo.vn", role: "Kế toán" }, { email: "hdv@dulichdemo.vn", role: "Nhân viên (việc được giao)" },
+        ] },
+        ...DEMO_SEEDS.map(({ industry, demo: d }) => ({
+          slug: d.slug,
+          name: d.name,
+          industry: getPreset(industry).name,
+          accounts: [
+            { email: `admin@${d.domainEmail}`, role: "Chủ doanh nghiệp" },
+            { email: `letan@${d.domainEmail}`, role: "Lễ tân" },
+            { email: `ketoan@${d.domainEmail}`, role: "Kế toán" },
+          ],
+        })),
       ]
     : null;
 
@@ -19,7 +31,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-slate-100 to-cyan-50 p-4">
       <Suspense>
-        <LoginForm demo={demo as DemoAccount[] | null} />
+        <LoginForm demo={demo} password={process.env.SEED_ADMIN_PASSWORD || "Admin@123"} />
       </Suspense>
     </main>
   );

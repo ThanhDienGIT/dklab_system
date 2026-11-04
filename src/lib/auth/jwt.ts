@@ -17,6 +17,8 @@ export type AccessClaims = {
   name: string;
   perms: string[];
   roles: string[];
+  /** Có giá trị khi Super Admin đăng nhập thay (id quản trị viên nền tảng) */
+  imp?: string;
 };
 
 const key = () => new TextEncoder().encode(`jwt:${appSecret()}`);
@@ -48,6 +50,7 @@ export async function verifyAccessToken(token: string): Promise<AccessClaims | n
       name: payload.name as string,
       perms: (payload.perms as string[]) ?? [],
       roles: (payload.roles as string[]) ?? [],
+      ...(payload.imp ? { imp: payload.imp as string } : {}),
     };
   } catch {
     return null;
