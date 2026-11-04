@@ -48,7 +48,13 @@ for k in "${INDUSTRIES[@]}"; do
     fs.writeFileSync(p, s);' "$k" "$slug"
   git add src/site.config.ts
   if ! git diff --cached --quiet || [ -f .git/MERGE_HEAD ]; then git commit -q --no-edit -m "demo/$k: chỉ ngành $k, mặc định $slug, bật DEMO_MODE" ; fi
-  [ "${NO_PUSH:-0}" = "1" ] || git push -q -u origin "$br"
+  if [ "${NO_PUSH:-0}" != "1" ]; then
+    for wait in 2 4 8 16 0; do
+      git push -q -u origin "$br" && break
+      [ "$wait" = 0 ] && { echo "✗ Không push được $br"; git checkout -q "$BASE"; exit 1; }
+      echo "  push lỗi, thử lại sau ${wait}s"; sleep "$wait"
+    done
+  fi
 done
 git checkout -q "$BASE"
 echo "✓ Xong: ${INDUSTRIES[*]}"
