@@ -11,12 +11,17 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import * as schema from "../src/lib/db/schema";
 import { DEFAULT_ROLES, getPreset } from "../src/modules/presets";
+import { dbEnvNames, resolveDatabaseUrl } from "../src/lib/db/url";
 
-const url = process.env.DATABASE_URL;
+const url = resolveDatabaseUrl();
 if (!url) {
+  const names = dbEnvNames();
   console.warn("⚠️  Bỏ qua migrate: chưa có DATABASE_URL");
+  console.warn(`   VERCEL_ENV=${process.env.VERCEL_ENV ?? "(không phải Vercel)"} · nhánh=${process.env.VERCEL_GIT_COMMIT_REF ?? "?"}`);
+  console.warn(names.length ? `   Biến liên quan DB tìm thấy (không có chuỗi postgres:// hợp lệ): ${names.join(", ")}` : "   Không thấy biến DB nào: database chưa được Connect cho môi trường này.");
   process.exit(0);
 }
+console.log(`→ Dùng database từ biến môi trường (${process.env.VERCEL_ENV ?? "local"})`);
 
 const client = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
 const db = drizzle(client, { schema });

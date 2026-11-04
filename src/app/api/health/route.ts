@@ -2,6 +2,7 @@ import { hash } from "@node-rs/argon2";
 import { connection } from "next/server";
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import { dbEnvNames, resolveDatabaseUrl } from "@/lib/db/url";
 
 /**
  * Tự chẩn đoán cấu hình khi deploy (Vercel / VPS).
@@ -17,8 +18,14 @@ export async function GET() {
   const secret = process.env.APP_SECRET ?? "";
   add("APP_SECRET", secret.length >= 32 && !/change-me/i.test(secret), "Thêm biến APP_SECRET (chuỗi ngẫu nhiên ≥ 32 ký tự) trong Settings → Environment Variables rồi Redeploy");
 
-  const hasDbUrl = !!process.env.DATABASE_URL;
-  add("DATABASE_URL", hasDbUrl, "Chưa có database: Storage → Create Database → Neon → Connect vào project, rồi Redeploy");
+  const hasDbUrl = !!resolveDatabaseUrl();
+  const names = dbEnvNames();
+  add(
+    "DATABASE_URL",
+    hasDbUrl,
+    `Môi trường hiện tại (${process.env.VERCEL_ENV ?? "?"}) chưa có chuỗi kết nối DB. ` +
+      (names.length ? `Biến DB đang có: ${names.join(", ")}.` : "Không có biến DB nào: Storage → Neon → Connect, tick đủ Production + Preview, rồi Redeploy."),
+  );
 
   let dbOk = false;
   if (hasDbUrl) {
