@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # ────────────────────────────────────────────────────────────────────────────
-# DKLab — image production (Next.js standalone, ~250 MB, chạy user không phải root)
+# DKLab — image production (Next.js standalone, ~440 MB, chạy user không phải root)
 #
 #   docker build -t dklab .                                   # đủ mọi ngành
 #   docker build -t dklab-spa --build-arg PLUGINS=spa .       # chỉ đóng gói ngành spa
