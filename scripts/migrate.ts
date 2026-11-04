@@ -50,6 +50,7 @@ async function seedTenant() {
         slug,
         name: "Du Lịch Demo",
         industry: "travel",
+        plan: "pro",
         settings: {
           brand: { primaryColor: "#0369a1", tagline: "Hành trình trọn vẹn – Giá minh bạch – Hỗ trợ 24/7" },
           contact: { phone: "0901234567", hotline: "1900 0000", email: "booking@dulichdemo.vn", address: "123 Nguyễn Huệ, Quận 1, TP.HCM", zalo: "0901234567" },
@@ -162,6 +163,7 @@ async function seedIndustry(industry: string, d: DemoSeed) {
         slug: d.slug,
         name: d.name,
         industry,
+        plan: "pro",
         settings: {
           brand: { primaryColor: preset.color, tagline: preset.tagline },
           contact: d.contact,

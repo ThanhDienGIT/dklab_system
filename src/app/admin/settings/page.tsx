@@ -2,6 +2,7 @@
 import { Globe, Landmark, Plus, Receipt, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { QR } from "@/components/QR";
+import { UpsellCard, useHasModule } from "@/components/admin/AdminShell";
 import { Badge, Button, Field, PageHeader, Skeleton, useToast } from "@/components/ui";
 import { BANKS, buildVietQR } from "@/lib/payments/vietqr";
 import { errorMessage, useAddDomainMutation, useDeleteDomainMutation, useVerifyDomainMutation, useDomainsQuery, useMisaTestMutation, useSaveSettingsMutation, useSettingsQuery } from "@/store/api";
@@ -148,6 +149,13 @@ function SettingsForm({ data }: { data: SettingsData }) {
 }
 
 function DomainsSection() {
+  const hasModule = useHasModule();
+  if (!hasModule("custom_domain"))
+    return <UpsellCard title="Tên miền riêng" text="Website đang chạy trên subdomain miễn phí. Gắn tên miền của bạn (vd: spahoamai.vn) với plugin Tên miền riêng, có trong gói Chuyên nghiệp." />;
+  return <DomainsManager />;
+}
+
+function DomainsManager() {
   const { data } = useDomainsQuery();
   const [add, { isLoading }] = useAddDomainMutation();
   const [verify, vState] = useVerifyDomainMutation();

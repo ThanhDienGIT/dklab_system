@@ -1,6 +1,6 @@
 "use client";
 import {
-  CalendarClock, CalendarDays, ExternalLink, FileText, History, Home, IdCard, Inbox, LayoutGrid, List, LogOut, Map, Menu, Receipt, Settings, Shield, ShieldAlert, Users, type LucideIcon,
+  CalendarClock, CalendarDays, ExternalLink, FileText, History, Home, IdCard, Inbox, LayoutGrid, List, LogOut, Map, Menu, Receipt, Settings, Shield, ShieldAlert, Store, Users, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,7 +13,26 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { StoreProvider } from "@/store/Provider";
 import { closeSidebar, setSession, toggleSidebar } from "@/store/store";
 
-const ICONS: Record<string, LucideIcon> = { home: Home, shield: Shield, settings: Settings, history: History, inbox: Inbox, users: Users, id: IdCard, receipt: Receipt, map: Map, file: FileText, list: List, grid: LayoutGrid, calendar: CalendarDays, tax: CalendarClock };
+const ICONS: Record<string, LucideIcon> = { home: Home, shield: Shield, settings: Settings, history: History, inbox: Inbox, users: Users, id: IdCard, receipt: Receipt, map: Map, file: FileText, list: List, grid: LayoutGrid, calendar: CalendarDays, tax: CalendarClock, store: Store };
+
+/** Doanh nghiệp đã có module / plugin này chưa (gói, ngành, mua, dùng thử) */
+export function useHasModule() {
+  const { data } = useMeQuery();
+  return (key: string) => !!data?.modules.includes(key);
+}
+
+/** Thẻ gợi ý mua plugin khi tính năng chưa được mở khóa */
+export function UpsellCard({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-orange-300 bg-orange-50/60 p-4 text-sm">
+      <div className="font-semibold text-slate-900">{title}</div>
+      <p className="mt-1 text-slate-600">{text}</p>
+      <Link href="/admin/store" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-orange-500">
+        <Store size={14} /> Mở Cửa hàng plugin
+      </Link>
+    </div>
+  );
+}
 
 export function usePerm() {
   const { data } = useMeQuery();
@@ -25,7 +44,8 @@ function Shell({ children }: { children: ReactNode }) {
   const dispatch = useAppDispatch();
   const open = useAppSelector((s) => s.ui.sidebarOpen);
   const session = useAppSelector((s) => s.session);
-  const { data: me, isLoading } = useMeQuery();
+  // Hiện ngay từ cache, nhưng luôn tải lại ngầm khi mở trang: quyền / plugin có thể vừa thay đổi
+  const { data: me, isLoading } = useMeQuery(undefined, { refetchOnMountOrArgChange: true });
   // Badge số đặt chỗ mới: dùng chung cache dashboard, tự làm mới mỗi 60 giây
   const canDash = hasPermission(me?.user.perms, "dashboard.view");
   const newCount = useDashboardQuery(undefined, { skip: !canDash, pollingInterval: 60_000 }).data?.bookings.newCount;
@@ -49,7 +69,7 @@ function Shell({ children }: { children: ReactNode }) {
     .flatMap((m) => m.nav)
     .filter((n) => hasPermission(me?.user.perms, n.permission) || hasPermission(me?.user.perms, n.permission.replace(/\.view$/, ".view:own")));
   // Sắp xếp: Tổng quan, Đặt chỗ, nghiệp vụ, rồi hệ thống
-  const order = ["/admin", "/admin/bookings", "/admin/resources", "/admin/schedule", "/admin/catalog", "/admin/tours", "/admin/contracts", "/admin/tax", "/admin/invoices", "/admin/customers", "/admin/employees", "/admin/users", "/admin/settings", "/admin/audit"];
+  const order = ["/admin", "/admin/bookings", "/admin/resources", "/admin/schedule", "/admin/catalog", "/admin/tours", "/admin/contracts", "/admin/tax", "/admin/invoices", "/admin/customers", "/admin/employees", "/admin/users", "/admin/settings", "/admin/store", "/admin/audit"];
   nav.sort((a, b) => order.indexOf(a.href) - order.indexOf(b.href));
 
   async function logout() {

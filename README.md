@@ -88,6 +88,47 @@ npm run db:migrate                                 # tạo doanh nghiệp demo s
 
 Lệnh trên tạo `src/plugins/salon/manifest.ts` (nhãn, màu, giờ mở cửa, module) và `seed.ts` (dữ liệu mẫu). Registry tự sinh (`src/plugins/_registry.ts`) khi chạy `dev` / `build`, **không sửa code core**. Ngành cần màn hình riêng (như kế toán) thì khai báo `modules` trong manifest, kèm quyền và menu riêng.
 
+## Gói dịch vụ & Cửa hàng plugin
+
+| Cửa hàng plugin | Thanh toán đơn mua |
+|---|---|
+| ![](docs/screenshots/store.png) | ![](docs/screenshots/store-qr.png) |
+
+Doanh nghiệp bắt đầu với **gói Cơ bản** (website + đặt chỗ theo ngành, khách hàng, nhân viên, phân quyền, hóa đơn + VietQR). Cần thêm tính năng nào thì vào **Admin → Cửa hàng plugin** để mua.
+
+| Gói | Giá / tháng | Tặng kèm |
+|---|---|---|
+| Cơ bản | 199.000₫ | Module theo ngành |
+| Chuyên nghiệp | 399.000₫ | + Hóa đơn điện tử MISA, Tên miền riêng, Lịch timeline |
+| Doanh nghiệp | 799.000₫ | + Toàn bộ plugin |
+
+| Plugin | Giá / tháng |
+|---|---|
+| Hóa đơn điện tử MISA | 99.000₫ |
+| Tên miền riêng | 49.000₫ |
+| Lịch timeline | 79.000₫ |
+| Sơ đồ & tài nguyên | 99.000₫ |
+| Danh mục (menu / dịch vụ) | 79.000₫ |
+| Tour du lịch | 149.000₫ |
+| Hợp đồng & lịch thuế | 199.000₫ |
+
+Bảng giá nằm ở `src/modules/plans.ts`.
+
+**Luồng mua:**
+1. Chủ doanh nghiệp chọn plugin hoặc gói, chọn kỳ 1 / 3 / 6 / 12 tháng (**12 tháng chỉ trả 10**).
+2. Hệ thống tạo đơn kèm **mã VietQR** chuyển vào tài khoản nền tảng (`PLATFORM_BANK_*`), nội dung là mã đơn để đối soát.
+3. Super Admin vào **/superdklab → Đơn mua**, đối chiếu sao kê rồi bấm **Xác nhận**.
+4. Plugin kích hoạt ngay; hạn dùng cộng theo tháng dương lịch, gia hạn thì cộng dồn.
+5. Trang Cửa hàng tự làm mới và báo khi đơn được duyệt.
+
+Mỗi plugin được **dùng thử 14 ngày một lần**, kích hoạt ngay không cần duyệt.
+
+**Bảo mật:**
+- Plugin chưa mua hoặc hết hạn thì **API bị chặn ở server** (403 `MODULE_REQUIRED`), không chỉ ẩn menu.
+- Giá do server tính; client không sửa được số tiền.
+- Chỉ người có quyền `billing.manage` (Chủ) mới mua được. Doanh nghiệp không tự duyệt được đơn của mình.
+- Quyền sử dụng = module lõi + module theo ngành + plugin tặng kèm gói (còn hạn) + plugin mua / dùng thử / cấp tay (còn hạn), cache 15 giây.
+
 ## Super Admin (`/superdklab`)
 
 - Tài khoản **tách biệt hoàn toàn** với doanh nghiệp: khóa ký JWT, issuer, audience và cookie riêng, phiên 8 giờ. Đổi mật khẩu thì mọi phiên cũ bị thu hồi.
@@ -135,12 +176,13 @@ Lệnh trên tạo `src/plugins/salon/manifest.ts` (nhãn, màu, giờ mở cử
 - Form public: honeypot + rate limit theo IP và theo SĐT/email. Màu, URL ảnh được kiểm tra định dạng.
 - `DEMO_MODE=1` mới hiện tài khoản demo và cho đổi tenant bằng `?tenant=`. Production từ chối chạy với `APP_SECRET` mẫu.
 
-**Kiểm thử bảo mật**: `npm run test:security` chạy **44 kịch bản tấn công** thật qua HTTP:
+**Kiểm thử bảo mật**: `npm run test:security` chạy **55 kịch bản tấn công** thật qua HTTP:
 - Chiếm domain, SSRF, IDOR chéo tenant (tour, bàn, lịch giữ chỗ, sơ đồ), leo quyền, CSRF.
 - Thu hồi token, brute force, header bảo mật.
 - Tách biệt Super Admin ↔ doanh nghiệp, đăng nhập thay, khóa doanh nghiệp.
+- Cửa hàng plugin: chặn tính năng chưa mua, sửa giá, tự duyệt đơn, dùng thử lặp.
 
-Kết quả hiện tại: 44/44 bị chặn.
+Kết quả hiện tại: 55/55 bị chặn.
 
 > Trên Vercel nên cấu hình `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (gói miễn phí) để rate limit đúng trên mọi instance.
 > Tự host: đặt nginx/Caddy ghi đè header `X-Real-IP`.
@@ -207,6 +249,7 @@ npm run dev
    - `SEED_ADMIN_PASSWORD`: mật khẩu cho tài khoản demo
    - `DEMO_MODE=1` chỉ cho bản demo (không bật cho khách thật)
    - `PLATFORM_ADMIN_USER`, `PLATFORM_ADMIN_PASSWORD`: tài khoản Super Admin tạo lần đầu (đổi mật khẩu ngay)
+   - `PLATFORM_BANK_BIN`, `PLATFORM_BANK_ACCOUNT`, `PLATFORM_BANK_NAME`: tài khoản nhận tiền bán gói / plugin
    - (khuyến nghị) `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
 4. Deploy. Lệnh `npm run build` tự chạy migrate + seed (idempotent) rồi `next build`.
 5. Domain:
@@ -230,6 +273,6 @@ npm run dev
 
 - Gọi món tại bàn bằng QR + màn hình bếp (KDS) cho cà phê / nhà hàng
 - Gói liệu trình (spa), giá phòng theo mùa / cuối tuần (khách sạn)
-- Thu phí doanh nghiệp theo gói (billing nền tảng), 2FA cho Super Admin
+- Tự động đối soát chuyển khoản (webhook Casso / SePay) để kích hoạt plugin không cần duyệt tay; 2FA cho Super Admin
 - Webhook ngân hàng (Casso / SePay) để tự đối soát chuyển khoản VietQR
 - Gửi SMS / Zalo ZNS / email xác nhận; chấm công, ca làm, lương

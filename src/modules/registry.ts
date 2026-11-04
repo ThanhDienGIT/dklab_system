@@ -23,12 +23,14 @@ const CORE_MODULES: ModuleManifest[] = [
       { key: "settings.manage", label: "Cấu hình doanh nghiệp, ngân hàng, domain, hóa đơn điện tử" },
       { key: "users.manage", label: "Quản lý tài khoản đăng nhập & vai trò" },
       { key: "audit.view", label: "Xem nhật ký hoạt động" },
+      { key: "billing.manage", label: "Mua gói / plugin, xem đơn mua" },
     ],
     nav: [
       { href: "/admin", label: "Tổng quan", icon: "home", permission: "dashboard.view" },
       { href: "/admin/users", label: "Tài khoản & quyền", icon: "shield", permission: "users.manage" },
       { href: "/admin/settings", label: "Cài đặt", icon: "settings", permission: "settings.manage" },
       { href: "/admin/audit", label: "Nhật ký", icon: "history", permission: "audit.view" },
+      { href: "/admin/store", label: "Cửa hàng plugin", icon: "store", permission: "billing.manage" },
     ],
   },
   {
@@ -75,9 +77,22 @@ const CORE_MODULES: ModuleManifest[] = [
       { key: "invoice.create", label: "Lập hóa đơn" },
       { key: "invoice.payment", label: "Ghi nhận thanh toán" },
       { key: "invoice.cancel", label: "Hủy hóa đơn" },
-      { key: "einvoice.publish", label: "Đẩy / phát hành hóa đơn điện tử MISA" },
     ],
     nav: [{ href: "/admin/invoices", label: "Hóa đơn", icon: "receipt", permission: "invoice.view" }],
+  },
+  {
+    key: "einvoice",
+    name: "Hóa đơn điện tử MISA",
+    description: "Đẩy hóa đơn sang MISA meInvoice, phát hành, lưu số hóa đơn",
+    permissions: [{ key: "einvoice.publish", label: "Đẩy / phát hành hóa đơn điện tử MISA" }],
+    nav: [],
+  },
+  {
+    key: "custom_domain",
+    name: "Tên miền riêng",
+    description: "Gắn tên miền của doanh nghiệp (dulichabc.vn), xác minh DNS, SSL tự động",
+    permissions: [],
+    nav: [],
   },
   {
     key: "catalog",

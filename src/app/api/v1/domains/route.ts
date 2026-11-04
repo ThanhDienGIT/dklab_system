@@ -13,7 +13,7 @@ const RESERVED = [ROOT_DOMAIN, "vercel.app", "vercel.com", "localhost", "meinvoi
 export const GET = withAuth("settings.manage", async (_req, ctx) => {
   const rows = await db.select().from(D).where(eq(D.tenantId, ctx.tid)).orderBy(asc(D.createdAt));
   return ok(rows.map((d) => ({ ...d, txtName: `_dklab-verify.${d.domain}`, txtValue: d.verifyToken ? `dklab-verify=${d.verifyToken}` : null })));
-});
+}, { module: "custom_domain" });
 
 const Body = z.object({
   domain: z
@@ -34,5 +34,5 @@ export const POST = withAuth("settings.manage", async (req, ctx) => {
   const [row] = await db.insert(D).values({ ...b, tenantId: ctx.tid, verifyToken: randomToken(16), verifiedAt: null }).returning();
   await audit(ctx, "domain.create", "domain", row.id, b);
   return ok({ ...row, txtName: `_dklab-verify.${row.domain}`, txtValue: `dklab-verify=${row.verifyToken}` });
-});
+}, { module: "custom_domain" });
 

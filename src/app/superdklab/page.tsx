@@ -1,5 +1,5 @@
 "use client";
-import { Building2, CalendarCheck, Plus, Search, Users, Wallet } from "lucide-react";
+import { Building2, CalendarCheck, Plus, Search, ShoppingBag, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge, Button, Empty, Field, Modal, PageHeader, Skeleton, Stat, useToast } from "@/components/ui";
@@ -25,6 +25,12 @@ export default function PlatformHome() {
         <Stat label="Doanh thu đã thu 30 ngày" value={vnd(stats?.revenue30 ?? 0)} sub="Tổng các doanh nghiệp" icon={<Wallet size={16} />} />
         <Stat label="Tài khoản người dùng" value={stats?.users ?? "…"} icon={<Users size={16} />} />
       </div>
+      {!!stats?.pendingOrders && (
+        <Link href="/superdklab/orders" className="mt-3 flex items-center gap-2 rounded-xl bg-amber-100 px-4 py-3 text-sm font-medium text-amber-900 hover:bg-amber-200">
+          <ShoppingBag size={16} /> {stats.pendingOrders} đơn mua gói / plugin đang chờ xác nhận thanh toán →
+        </Link>
+      )}
+      {!!stats && <p className="mt-2 text-xs text-slate-500">Doanh thu cửa hàng plugin 30 ngày: <b>{vnd(stats.storeRevenue30)}</b></p>}
       {!!stats?.byIndustry.length && (
         <div className="mt-3 flex flex-wrap gap-2">
           {stats.byIndustry.map((x) => <span key={x.industry} className="rounded-full bg-white px-3 py-1 text-xs shadow-sm ring-1 ring-slate-200">{getPreset(x.industry).name}: <b>{x.n}</b></span>)}

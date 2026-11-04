@@ -69,7 +69,12 @@ export default function TenantDetail({ params }: { params: Promise<{ id: string 
 
         <section className="card p-4">
           <h2 className="mb-1 flex items-center gap-2 font-semibold"><Puzzle size={17} /> Module</h2>
-          <p className="mb-3 text-xs text-slate-500">Module lõi luôn bật. Preset ngành {preset.name}: {preset.modules.join(", ")}</p>
+          <p className="mb-2 text-xs text-slate-500">Module lõi luôn bật. Preset ngành {preset.name}: {preset.modules.join(", ")}. Tick để <b>cấp tay</b> (không hết hạn); plugin đã mua / dùng thử giữ nguyên hạn.</p>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {t.grants.filter((g) => !["core"].includes(g.source)).map((g) => (
+              <span key={g.key} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px]">{g.key} · {g.source}{g.expiresAt ? ` · đến ${new Date(g.expiresAt).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}` : ""}</span>
+            ))}
+          </div>
           <div className="grid gap-1.5 sm:grid-cols-2">
             {MODULES.map((mod) => (
               <label key={mod.key} className="flex items-start gap-2 rounded-lg border p-2 text-sm">

@@ -18,15 +18,18 @@ export type PTenantDetail = Omit<PTenant, "domains" | "users"> & {
   settings: { contact?: { phone?: string; email?: string; address?: string }; brand?: { primaryColor?: string } };
   modules: { key: string; enabled: boolean }[];
   domains: { id: string; domain: string; verifiedAt: string | null; isPrimary: boolean }[];
+  grants: { key: string; source: string; expiresAt: string | null }[];
+  planExpiresAt: string | null;
   users: { id: string; fullName: string; email: string | null; phone: string | null; status: string; lastLoginAt: string | null; roles: string[] }[];
 };
-export type PStats = { tenants: { total: number; active: number; new30: number }; bookings30: number; revenue30: number; users: number; byIndustry: { industry: string; n: number }[] };
+export type PStats = { tenants: { total: number; active: number; new30: number }; bookings30: number; revenue30: number; users: number; byIndustry: { industry: string; n: number }[]; pendingOrders: number; storeRevenue30: number };
+export type POrder = { id: string; tenantId: string; tenantName: string; tenantSlug: string; kind: "addon" | "plan" | "trial"; target: string; months: number; amount: number; code: string; status: "pending" | "paid" | "cancelled"; createdAt: string; paidAt: string | null; note: string | null };
 export type PAudit = { id: string; action: string; tenantId: string | null; data: unknown; ip: string | null; createdAt: string; adminName: string | null; tenantName: string | null };
 
 export const platformApi = createApi({
   reducerPath: "platform",
   baseQuery,
-  tagTypes: ["Tenant", "Stats", "Audit"],
+  tagTypes: ["Tenant", "Stats", "Audit", "Order"],
   refetchOnMountOrArgChange: 15,
   endpoints: (b) => ({
     me: b.query<{ id: string; name: string; username: string }, void>({ query: () => "/me" }),
@@ -41,6 +44,8 @@ export const platformApi = createApi({
     verifyDomain: b.mutation<unknown, { id: string; verified: boolean }>({ query: ({ id, ...body }) => ({ url: `/domains/${id}`, method: "PATCH", body }), invalidatesTags: ["Tenant", "Audit"] }),
     deleteDomain: b.mutation<unknown, string>({ query: (id) => ({ url: `/domains/${id}`, method: "DELETE" }), invalidatesTags: ["Tenant", "Audit"] }),
     audit: b.query<PAudit[], void>({ query: () => "/audit", providesTags: ["Audit"] }),
+    orders: b.query<POrder[], string>({ query: (status) => ({ url: "/orders", params: { status } }), providesTags: ["Order"] }),
+    decideOrder: b.mutation<unknown, { id: string; action: "approve" | "reject"; note?: string }>({ query: ({ id, ...body }) => ({ url: `/orders/${id}`, method: "POST", body }), invalidatesTags: ["Order", "Stats", "Tenant", "Audit"] }),
     changePassword: b.mutation<unknown, { current: string; next: string }>({ query: (body) => ({ url: "/me/password", method: "POST", body }) }),
   }),
 });
@@ -51,4 +56,5 @@ export const makePlatformStore = () =>
 export const {
   useMeQuery: usePMe, useStatsQuery, useTenantsQuery, useTenantQuery, useCreateTenantMutation, useUpdateTenantMutation, useSetModulesMutation,
   useResetPasswordMutation, useImpersonateMutation, useVerifyDomainMutation, useDeleteDomainMutation, useAuditQuery: usePAudit, useChangePasswordMutation,
+  useOrdersQuery, useDecideOrderMutation,
 } = platformApi;

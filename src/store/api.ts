@@ -66,7 +66,7 @@ export const api = createApi({
       return a.payload[reducerPath] as never;
     }
   },
-  tagTypes: ["Me", "Dashboard", "Booking", "Customer", "Employee", "User", "Role", "Tour", "Invoice", "Settings", "Domain", "Audit", "Catalog", "Resource", "Reservation", "Contract", "Tax"],
+  tagTypes: ["Me", "Dashboard", "Booking", "Customer", "Employee", "User", "Role", "Tour", "Invoice", "Settings", "Domain", "Audit", "Catalog", "Resource", "Reservation", "Contract", "Tax", "Store"],
   endpoints: (b) => ({
     me: b.query<T.Me, void>({ query: () => "/auth/me", providesTags: ["Me"] }),
     dashboard: b.query<T.Dashboard, void>({ query: () => "/v1/dashboard", providesTags: ["Dashboard"] }),
@@ -212,6 +212,18 @@ export const api = createApi({
       invalidatesTags: ["Reservation", "Resource", "Booking", "Dashboard"],
     }),
 
+    /* ── Cửa hàng plugin ── */
+    store: b.query<T.StoreData, void>({ query: () => "/v1/store", providesTags: ["Store"] }),
+    createOrder: b.mutation<T.StoreOrder, { kind: "addon" | "plan"; target: string; months: number }>({
+      query: (body) => ({ url: "/v1/store/orders", method: "POST", body }),
+      invalidatesTags: ["Store"],
+    }),
+    cancelOrder: b.mutation<T.StoreOrder, string>({ query: (id) => ({ url: `/v1/store/orders/${id}/cancel`, method: "POST" }), invalidatesTags: ["Store"] }),
+    startTrial: b.mutation<{ module: string; days: number }, string>({
+      query: (module) => ({ url: "/v1/store/trial", method: "POST", body: { module } }),
+      invalidatesTags: ["Store", "Me"],
+    }),
+
     /* ── Kế toán ── */
     contracts: b.query<T.Contract[], void>({ query: () => "/v1/contracts", providesTags: ["Contract"] }),
     saveContract: b.mutation<T.Contract, Partial<T.Contract>>({
@@ -250,4 +262,5 @@ export const {
   useReservationsQuery, useWalkinMutation, useUpdateReservationMutation,
   useContractsQuery, useSaveContractMutation, useDeleteContractMutation, useBillContractsMutation,
   useTaxTasksQuery, useGenerateTaxMutation, useUpdateTaxMutation,
+  useStoreQuery, useCreateOrderMutation, useCancelOrderMutation, useStartTrialMutation,
 } = api;

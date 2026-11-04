@@ -6,6 +6,7 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { db, schema } from "./db";
 import { ACCESS_COOKIE, verifyAccessToken, type AccessClaims } from "./auth/jwt";
 import { hasPermission, permissionScope, type Scope } from "@/modules/registry";
+import { getEntitlements, moduleName, moduleOfPermission } from "./services/entitlements";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) {
@@ -113,6 +114,7 @@ async function sessionValid(c: AccessClaims): Promise<boolean> {
 export function withAuth<P = unknown>(
   permission: string | null,
   handler: (req: NextRequest, ctx: AuthContext, params: P) => Promise<Response>,
+  opts: { module?: string } = {},
 ) {
   return async (req: NextRequest, routeCtx: { params: Promise<P> }) => {
     try {
@@ -123,6 +125,13 @@ export function withAuth<P = unknown>(
       if (permission) {
         if (!hasPermission(claims.perms, permission)) throw new ApiError(403, "Bạn không có quyền thực hiện thao tác này");
         scope = permissionScope(claims.perms, permission) ?? "own";
+      }
+      // Module (plugin) chưa mua / đã hết hạn => chặn ở server, không chỉ ẩn menu
+      const mod = opts.module ?? (permission ? moduleOfPermission(permission) : undefined);
+      if (mod) {
+        const ent = await getEntitlements(claims.tid);
+        if (!ent.modules.has(mod))
+          throw new ApiError(403, `Tính năng này thuộc plugin "${moduleName(mod)}". Vào Cửa hàng plugin để mua hoặc dùng thử.`, { code: "MODULE_REQUIRED", module: mod });
       }
       const params = (await routeCtx?.params) as P;
       // Mọi tham số [id] trên URL phải là UUID hợp lệ (tránh lỗi SQL 500 / dò dữ liệu)

@@ -41,6 +41,8 @@ export const tenants = pgTable("tenants", {
   industry: text("industry").notNull(), // travel | cafe | restaurant | hotel | spa | accounting
   status: text("status").notNull().default("active"), // active | suspended
   plan: text("plan").notNull().default("basic"),
+  /** Hạn gói; quá hạn => quay về gói Cơ bản */
+  planExpiresAt: timestamp("plan_expires_at", { withTimezone: true }),
   /** Thương hiệu, liên hệ, tài khoản ngân hàng, cấu hình MISA (mật khẩu được mã hóa)… */
   settings: jsonb("settings").$type<TenantSettings>().notNull().default({}),
   createdAt: createdAt(),
@@ -64,6 +66,10 @@ export const tenantModules = pgTable(
     tenantId: tenantId(),
     moduleKey: text("module_key").notNull(),
     enabled: boolean("enabled").notNull().default(true),
+    /** industry (theo ngành) | addon (mua) | trial (dùng thử) | manual (Super Admin cấp) */
+    source: text("source").notNull().default("industry"),
+    /** Hết hạn (plugin mua / dùng thử). null = không hết hạn */
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     config: jsonb("config").notNull().default({}),
   },
   (t) => [primaryKey({ columns: [t.tenantId, t.moduleKey] })],
@@ -591,4 +597,29 @@ export const platformAuditLogs = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("platform_audit_created_idx").on(t.createdAt)],
+);
+
+/* ═════════════ Cửa hàng plugin: đơn mua gói / plugin ═════════════ */
+export const addonOrders = pgTable(
+  "addon_orders",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    /** addon | plan | trial */
+    kind: text("kind").notNull(),
+    /** module key (addon/trial) hoặc plan key */
+    target: text("target").notNull(),
+    months: integer("months").notNull().default(1),
+    /** Số tiền do server tính theo bảng giá (client không gửi giá) */
+    amount: money("amount"),
+    /** Nội dung chuyển khoản để đối soát, vd "DKP7Q2K" */
+    code: text("code").notNull().unique(),
+    status: text("status").notNull().default("pending"), // pending | paid | cancelled
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    approvedBy: uuid("approved_by"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("addon_orders_tenant_idx").on(t.tenantId, t.createdAt), index("addon_orders_status_idx").on(t.status)],
 );

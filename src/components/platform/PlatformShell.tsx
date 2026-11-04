@@ -1,5 +1,5 @@
 "use client";
-import { History, KeyRound, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
+import { History, KeyRound, LayoutDashboard, LogOut, ShieldCheck, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
@@ -9,6 +9,7 @@ import { makePlatformStore, usePMe } from "@/store/platform";
 
 const NAV = [
   { href: "/superdklab", label: "Tổng quan & doanh nghiệp", icon: LayoutDashboard },
+  { href: "/superdklab/orders", label: "Đơn mua gói / plugin", icon: ShoppingBag },
   { href: "/superdklab/audit", label: "Nhật ký nền tảng", icon: History },
   { href: "/superdklab/account", label: "Tài khoản & mật khẩu", icon: KeyRound },
 ];

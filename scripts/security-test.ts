@@ -193,10 +193,34 @@ async function main() {
   r = await owner.req("POST", "/api/v1/reservations", { resourceId: B.resId, durationMin: 60 });
   check("Không xếp khách vào bàn của tenant khác", blocked(r), `${r.status}`);
   r = await owner.req("PATCH", `/api/v1/resources/${B.resId}`, { name: "hacked" });
-  check("Không sửa được bàn của tenant khác", r.status === 404, `${r.status}`);
+  check("Không sửa được bàn của tenant khác", blocked(r), `${r.status}`);
   r = await owner.req("PUT", "/api/v1/resources/layout", { items: [{ id: B.resId, x: 9, y: 9 }] });
   const [bres] = await sql`select x from resources where id = ${B.resId}`;
   check("Lưu sơ đồ không đụng được bàn tenant khác", bres.x === 0, `x=${bres.x}`);
+
+  console.log("\n— 13. Gói & cửa hàng plugin");
+  const bo = new Client();
+  await bo.req("POST", "/api/auth/login", { identifier: "owner@b.test", password: PW }, { cookie: "dk_tenant=secb_test" });
+  r = await bo.req("POST", "/api/v1/invoices/00000000-0000-0000-0000-000000000000/einvoice", { action: "create" });
+  check("Gói Cơ bản chưa mua plugin MISA => API bị chặn ở server", r.status === 403 && (r.json as { details?: { code?: string } })?.details?.code === "MODULE_REQUIRED", `${r.status}`);
+  r = await bo.req("GET", "/api/v1/domains");
+  check("Chưa có plugin Tên miền riêng => API tên miền bị chặn", r.status === 403, `${r.status}`);
+  r = await bo.req("POST", "/api/v1/store/orders", { kind: "addon", target: "einvoice", months: 1, amount: 1, price: 1 });
+  const orderId = r.json?.data?.id as string;
+  check("Giá đơn do server tính (bỏ qua giá client gửi)", r.status === 200 && r.json?.data?.amount === 99000, `${r.status} amount=${r.json?.data?.amount}`);
+  r = await bo.req("POST", "/api/v1/store/orders", { kind: "addon", target: "einvoice", months: 2 });
+  check("Kỳ hạn không hợp lệ bị từ chối", r.status === 422, `${r.status}`);
+  r = await bo.req("POST", "/api/v1/store/orders", { kind: "addon", target: "khong_co", months: 1 });
+  check("Không mua được plugin không tồn tại", r.status === 422, `${r.status}`);
+  r = await rec.req("GET", "/api/v1/store");
+  check("Lễ tân (không có billing.manage) không vào được cửa hàng", r.status === 403, `${r.status}`);
+  r = await bo.req("POST", `/api/platform/orders/${orderId}`, { action: "approve" });
+  check("Doanh nghiệp KHÔNG tự duyệt được đơn của mình", r.status === 401, `${r.status}`);
+  r = await bo.req("POST", "/api/v1/store/trial", { module: "custom_domain" });
+  const dom = await bo.req("GET", "/api/v1/domains");
+  check("Dùng thử 14 ngày mở khóa plugin ngay", r.status === 200 && dom.status === 200, `${r.status}/${dom.status}`);
+  r = await bo.req("POST", "/api/v1/store/trial", { module: "custom_domain" });
+  check("Không dùng thử lại lần 2", r.status === 409, `${r.status}`);
 
   console.log("\n— 12. Super Admin nền tảng");
   r = await owner.req("GET", "/api/platform/tenants");
@@ -210,6 +234,11 @@ async function main() {
   check("Token Super Admin KHÔNG dùng làm token doanh nghiệp được", r.status === 401, `${r.status}`);
   const page = await fetch(BASE + "/superdklab", { redirect: "manual" });
   check("/superdklab chưa đăng nhập => chuyển tới trang login", page.status === 307 && (page.headers.get("location") ?? "").includes("/superdklab/login"), `${page.status}`);
+  r = await pa.req("POST", `/api/platform/orders/${orderId}`, { action: "approve" });
+  const afterPaid = await bo.req("POST", "/api/v1/invoices/00000000-0000-0000-0000-000000000000/einvoice", { action: "create" });
+  check("Super Admin duyệt đơn => plugin MISA được kích hoạt", r.status === 200 && afterPaid.status === 404, `${r.status}/${afterPaid.status}`);
+  r = await pa.req("POST", `/api/platform/orders/${orderId}`, { action: "approve" });
+  check("Không duyệt trùng một đơn 2 lần", r.status === 404, `${r.status}`);
   r = await pa.req("POST", `/api/platform/tenants/${B.tid}/impersonate`, { reason: "" });
   check("Đăng nhập thay bắt buộc nhập lý do", r.status === 422, `${r.status}`);
   const imp = new Client();

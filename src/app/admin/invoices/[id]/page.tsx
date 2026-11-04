@@ -2,7 +2,7 @@
 import { ArrowLeft, CheckCircle2, Copy, FileUp, Printer, Send, Wallet, XCircle } from "lucide-react";
 import Link from "next/link";
 import { use, useState } from "react";
-import { usePerm } from "@/components/admin/AdminShell";
+import { UpsellCard, useHasModule, usePerm } from "@/components/admin/AdminShell";
 import { EINVOICE_STATUS, INVOICE_STATUS } from "@/components/admin/status";
 import { InvoiceDocument } from "@/components/InvoiceDocument";
 import { QR } from "@/components/QR";
@@ -24,6 +24,7 @@ export default function InvoiceDetail({ params }: { params: Promise<{ id: string
   const [signedXml, setSignedXml] = useState("");
   const toast = useToast();
   const can = usePerm();
+  const hasModule = useHasModule();
 
   if (isLoading || !inv) return <Skeleton rows={8} />;
   const payUrl = typeof window !== "undefined" ? `${window.location.origin}/pay/${inv.publicToken}` : "";
@@ -67,6 +68,9 @@ export default function InvoiceDetail({ params }: { params: Promise<{ id: string
         <aside className="no-print space-y-4">
           {!inv.bank && <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Chưa cấu hình tài khoản ngân hàng → chưa có mã VietQR. <Link className="underline" href="/admin/settings">Cài đặt</Link></div>}
 
+          {!hasModule("einvoice") ? (
+            <UpsellCard title="Hóa đơn điện tử MISA" text="Đẩy và phát hành hóa đơn điện tử ngay từ hệ thống. Có trong gói Chuyên nghiệp hoặc mua riêng, dùng thử miễn phí 14 ngày." />
+          ) : (
           <section className="card p-4">
             <h3 className="mb-2 flex items-center gap-2 font-semibold"><FileUp size={16} /> Hóa đơn điện tử MISA</h3>
             {env && <p className="mb-2 text-xs text-slate-500">Môi trường: {env === "mock" ? "Giả lập (demo)" : env === "test" ? "MISA Test" : "MISA Production"}</p>}
@@ -98,6 +102,7 @@ export default function InvoiceDetail({ params }: { params: Promise<{ id: string
               </ul>
             )}
           </section>
+          )}
 
           <section className="card p-4">
             <h3 className="mb-2 font-semibold">Lịch sử thanh toán</h3>

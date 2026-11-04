@@ -8,4 +8,4 @@ export const DELETE = withAuth<{ id: string }>("settings.manage", async (_req, c
   invalidateTenant();
   await audit(ctx, "domain.delete", "domain", id);
   return ok({ id });
-});
+}, { module: "custom_domain" });

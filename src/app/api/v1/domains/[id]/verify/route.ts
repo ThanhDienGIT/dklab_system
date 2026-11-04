@@ -23,4 +23,4 @@ export const POST = withAuth<{ id: string }>("settings.manage", async (_req, ctx
   invalidateTenant();
   await audit(ctx, "domain.verify", "domain", id, { domain: d.domain });
   return ok({ verified: true });
-});
+}, { module: "custom_domain" });

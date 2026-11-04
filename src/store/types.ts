@@ -6,6 +6,8 @@ export type Me = {
   industry: { key: string; name: string; engine: "tours" | "slots" | "tables" | "rooms"; booking: { open: string; close: string; step: number; durationMin: number; needsBed?: boolean; preorder?: boolean } };
   labels: { booking: string; resource: string; item: string; staff?: string; catalogNav: string; resourceNav: string };
   impersonatedBy: string | null;
+  plan: { key: string; expiresAt: string | null };
+  grants: { key: string; source: string; expiresAt: string | null }[];
 };
 
 export type BookingStatus = "new" | "contacted" | "confirmed" | "completed" | "cancelled";
@@ -112,4 +114,20 @@ export type Contract = {
 export type TaxTaskRow = {
   id: string; contractId: string; customerId: string; kind: string; label: string; period: string; dueDate: string; status: "pending" | "done";
   note: string | null; customerName: string; customerTaxCode: string | null; customerPhone: string | null; contractCode: string; overdue: boolean;
+};
+
+/* ───────── Cửa hàng plugin ───────── */
+export type StoreAddon = {
+  key: string; name: string; icon: string; price: number; category: string; summary: string; features: string[];
+  active: boolean; source: string | null; expiresAt: string | null; inIndustry: boolean; inPlan: boolean; trialAvailable: boolean;
+};
+export type StorePlan = { key: string; name: string; price: number; tagline: string; includes: string[]; highlights: string[] };
+export type StoreOrder = {
+  id: string; kind: "addon" | "plan" | "trial"; target: string; months: number; amount: number; code: string;
+  status: "pending" | "paid" | "cancelled"; createdAt: string; paidAt: string | null; note: string | null; qrPayload: string | null;
+};
+export type StoreData = {
+  plan: { key: string; expiresAt: string | null }; plans: StorePlan[]; trialDays: number;
+  bank: { bankBin: string; bankName: string; accountNumber: string; accountName: string };
+  addons: StoreAddon[]; orders: StoreOrder[];
 };
