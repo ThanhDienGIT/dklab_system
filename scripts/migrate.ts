@@ -8,13 +8,13 @@ import { hash } from "@node-rs/argon2";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
-import postgres from "postgres";
 import * as schema from "../src/lib/db/schema";
 import { DEFAULT_ROLES, getPreset } from "../src/modules/presets";
 import { dbEnvNames, resolveDatabaseUrl } from "../src/lib/db/url";
 import { DEMO_SEEDS } from "../src/plugins/_seeds";
 import type { DemoSeed } from "../src/plugins/types";
 import { tasksBetween } from "../src/lib/services/tax";
+import { ensureDatabase, mask, open, preflight } from "./lib/pg";
 
 const url = resolveDatabaseUrl();
 if (!url) {
@@ -24,9 +24,9 @@ if (!url) {
   console.warn(names.length ? `   Biến liên quan DB tìm thấy (không có chuỗi postgres:// hợp lệ): ${names.join(", ")}` : "   Không thấy biến DB nào: database chưa được Connect cho môi trường này.");
   process.exit(0);
 }
-console.log(`→ Dùng database từ biến môi trường (${process.env.VERCEL_ENV ?? "local"})`);
+console.log(`→ Database: ${mask(url)} (${process.env.VERCEL_ENV ?? "local"})`);
 
-const client = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
+const client = open(url);
 const db = drizzle(client, { schema });
 
 const days = (n: number) => new Date(Date.now() + n * 86400_000).toISOString().slice(0, 10);
@@ -277,6 +277,9 @@ async function seedPlatformAdmin() {
 }
 
 (async () => {
+  // Tạo database nếu chưa có + kiểm tra phiên bản / extension trước khi tạo bảng
+  await ensureDatabase(url);
+  console.log(`✓ PostgreSQL ${await preflight(client)}`);
   console.log("→ Chạy migration…");
   await migrate(db, { migrationsFolder: "./drizzle" });
   console.log("✓ Migration xong");

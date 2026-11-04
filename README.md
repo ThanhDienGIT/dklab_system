@@ -218,9 +218,23 @@ Kết quả hiện tại: 55/55 bị chặn.
 ```bash
 cp .env.example .env.local      # sửa DATABASE_URL, APP_SECRET
 npm install
-npm run db:migrate              # tạo bảng + seed tenant dulich_demo
+npm run db:setup                # tự tạo database + bảng + seed (mọi PostgreSQL ≥ 13)
 npm run dev
 ```
+
+Chưa có Postgres? `docker compose up -d` rồi dùng `DATABASE_URL=postgres://dklab:dklab@localhost:5432/dklab`.
+
+### Database (PostgreSQL ở bất kỳ đâu)
+
+| Lệnh | Tác dụng |
+|---|---|
+| `npm run db:setup` | Tự tạo database (nếu chưa có) → kiểm tra phiên bản/`btree_gist` → migration → seed demo. Chạy lại an toàn. `SEED=0` = chỉ tạo bảng |
+| `npm run db:backup` | Sao lưu toàn bộ dữ liệu ra `backups/*.json.gz` (không cần pg_dump) |
+| `npm run db:restore -- <file>` | Khôi phục vào server bất kỳ (tự tạo DB + bảng, 1 transaction; `--force` để ghi đè) |
+| `npm run db:export-sql` | Sinh lại `database/schema.sql` và `database/dklab_full.sql` |
+| `psql "$DATABASE_URL" -f database/dklab_full.sql` | Nạp sẵn toàn bộ CSDL + dữ liệu demo như một bản backup |
+
+Chi tiết: [database/README.md](database/README.md).
 
 - Website: http://localhost:3000
 - Quản trị: http://localhost:3000/admin

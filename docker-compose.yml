@@ -1,0 +1,19 @@
+# PostgreSQL local cho phát triển:  docker compose up -d
+# DATABASE_URL=postgres://dklab:dklab@localhost:5432/dklab  →  npm run db:setup
+services:
+  db:
+    image: postgres:16-alpine   # alpine đã kèm btree_gist
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dklab
+      POSTGRES_PASSWORD: dklab
+      POSTGRES_DB: dklab
+      TZ: Asia/Ho_Chi_Minh
+    ports: ["5432:5432"]
+    volumes: [dklab_pg:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dklab"]
+      interval: 5s
+      retries: 10
+volumes:
+  dklab_pg:
