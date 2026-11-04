@@ -8,13 +8,30 @@ const PREFERRED = ["DATABASE_URL", "POSTGRES_URL", "DATABASE_URL_UNPOOLED", "POS
 
 const isPg = (v?: string) => !!v && /^postgres(ql)?:\/\//i.test(v.trim());
 
+/**
+ * postgres.js gửi mọi tham số lạ trên URL thẳng tới server như "configuration parameter"
+ * => Postgres từ chối: unrecognized configuration parameter "channel_binding".
+ * Neon/Prisma thêm sẵn channel_binding, pgbouncer, schema… nên phải bỏ đi.
+ * (sslmode, connect_timeout được postgres.js hiểu nên giữ nguyên; kết nối vẫn mã hóa TLS.)
+ */
+const UNSUPPORTED_PARAMS = ["channel_binding", "pgbouncer", "schema", "statement_cache_size", "pool_timeout", "connection_limit"];
+export function normalizeDatabaseUrl(raw: string): string {
+  try {
+    const u = new URL(raw.trim());
+    for (const p of UNSUPPORTED_PARAMS) u.searchParams.delete(p);
+    return u.toString();
+  } catch {
+    return raw.trim();
+  }
+}
+
 export function resolveDatabaseUrl(env: Record<string, string | undefined> = process.env): string | undefined {
-  for (const k of PREFERRED) if (isPg(env[k])) return env[k]!.trim();
+  for (const k of PREFERRED) if (isPg(env[k])) return normalizeDatabaseUrl(env[k]!);
   // Có prefix tùy chỉnh: STORAGE_DATABASE_URL, DKLAB_POSTGRES_URL…
   const keys = Object.keys(env).sort();
   for (const suffix of ["_DATABASE_URL", "_POSTGRES_URL"]) {
     const k = keys.find((x) => x.endsWith(suffix) && isPg(env[x]));
-    if (k) return env[k]!.trim();
+    if (k) return normalizeDatabaseUrl(env[k]!);
   }
   return undefined;
 }
