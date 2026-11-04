@@ -5,16 +5,27 @@ import * as schema from "./schema";
 
 const globalForDb = globalThis as unknown as { __pg?: ReturnType<typeof postgres> };
 
-function createClient() {
+function make() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("Thiếu DATABASE_URL. Xem .env.example");
   // prepare:false để chạy được qua connection pooler (Neon/Supabase PgBouncer) trên Vercel.
-  return postgres(url, { max: process.env.NODE_ENV === "production" ? 5 : 10, prepare: false });
+  const client = globalForDb.__pg ?? postgres(url, { max: process.env.NODE_ENV === "production" ? 5 : 10, prepare: false });
+  if (process.env.NODE_ENV !== "production") globalForDb.__pg = client;
+  return drizzle(client, { schema, casing: "snake_case" });
 }
 
-const client = globalForDb.__pg ?? createClient();
-if (process.env.NODE_ENV !== "production") globalForDb.__pg = client;
+export type DB = ReturnType<typeof make>;
 
-export const db = drizzle(client, { schema, casing: "snake_case" });
-export type DB = typeof db;
+/**
+ * Kết nối được tạo ở truy vấn đầu tiên (lazy), không phải lúc nạp module
+ * => `next build` chạy được cả khi chưa gắn database.
+ */
+let instance: DB | null = null;
+export const db = new Proxy({} as DB, {
+  get(_t, prop) {
+    instance ??= make();
+    const v = Reflect.get(instance, prop, instance);
+    return typeof v === "function" ? v.bind(instance) : v;
+  },
+});
 export { schema };
