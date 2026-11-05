@@ -1,0 +1,4 @@
+# Script chạy trong Linux/Docker phải giữ xuống dòng LF (kể cả khi clone trên Windows)
+*.sh text eol=lf
+Dockerfile text eol=lf
+docker/** text eol=lf
