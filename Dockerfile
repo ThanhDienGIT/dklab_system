@@ -40,7 +40,8 @@ COPY --from=build --chown=dklab:dklab /app/public ./public
 COPY --from=build --chown=dklab:dklab /app/dist ./dist
 COPY --from=build --chown=dklab:dklab /app/drizzle ./drizzle
 COPY --chown=dklab:dklab docker/entrypoint.sh /usr/local/bin/dklab-entrypoint
-RUN chmod +x /usr/local/bin/dklab-entrypoint && mkdir -p /app/backups && chown dklab:dklab /app/backups
+# Bỏ ký tự \r nếu file bị đổi sang CRLF khi clone trên Windows
+RUN sed -i 's/\r$//' /usr/local/bin/dklab-entrypoint && chmod +x /usr/local/bin/dklab-entrypoint && mkdir -p /app/backups && chown dklab:dklab /app/backups
 USER dklab
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
